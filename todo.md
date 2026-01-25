@@ -134,3 +134,23 @@
 - [x] Reviewed all screens and components for text rendering issues
 - [x] All text content is properly wrapped in <Text> components
 - [x] TypeScript check passes with no errors
+
+## Bug Fixes (Round 3)
+
+### BUG: Text rendering error line 534-537
+- [x] Fixed step parsing to ensure instruction is always a string
+
+### BUG: Dish correction STILL doesn't update recipe
+- [x] Updated AI prompt to prioritize user-provided dish name
+- [x] AI now generates recipe for corrected dish, not image content
+- [x] New recipe data passed to Recipe Card screen
+
+### BUG: No AI image generation for text recipes
+- [x] Added server-side AI image generation endpoint using generateImage
+- [x] Generate food image based on dish name/description
+- [x] Connected Recipe Card button to real AI generationipes
+
+### BUG: Video shows wrong image (text photo instead of food)
+- [x] Pass generated AI image to video player
+- [x] Use AI-generated food image for Ken Burns effect
+- [ ] Never show handwritten text photo in video player

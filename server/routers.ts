@@ -5,6 +5,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { invokeLLM } from "./_core/llm";
 import { storagePut } from "./storage";
+import { generateImage } from "./_core/imageGeneration";
 
 // Recipe analysis response schema
 const recipeSchema = z.object({
@@ -126,10 +127,12 @@ Always return your response as valid JSON matching this exact structure:
 
         let userContent = "Please analyze this food image and provide a complete recipe.";
         if (dishName) {
-          userContent += `\n\nThe user believes this dish is: "${dishName}"`;
+          // When user provides a dish name, they are CORRECTING the AI's detection
+          // Generate a recipe specifically for that dish, not what's in the image
+          userContent = `The user has specified that this is "${dishName}". Please generate a complete, authentic recipe for ${dishName}. Use the image as visual reference for presentation, but create the recipe based on the dish name provided. The dish name in your response MUST be "${dishName}" or a close variant.`;
         }
         if (userNotes) {
-          userContent += `\n\nAdditional notes from the user: "${userNotes}"`;
+          userContent += `\n\nAdditional context from the user: "${userNotes}"`;
         }
 
         try {
@@ -372,6 +375,45 @@ Always return your response as valid JSON matching this exact structure:
           return {
             success: false,
             error: error instanceof Error ? error.message : "Failed to delete recipe",
+          };
+        }
+      }),
+
+    // Generate AI food image for a dish
+    generateImage: publicProcedure
+      .input(z.object({
+        dishName: z.string().describe("Name of the dish to generate image for"),
+        description: z.string().optional().describe("Description of the dish"),
+        cuisine: z.string().optional().describe("Cuisine type"),
+      }))
+      .mutation(async ({ input }) => {
+        const { dishName, description, cuisine } = input;
+
+        try {
+          // Build a detailed prompt for food image generation
+          let prompt = `A professional food photography shot of ${dishName}`;
+          if (cuisine) {
+            prompt += `, ${cuisine} cuisine`;
+          }
+          if (description) {
+            prompt += `. ${description}`;
+          }
+          prompt += ". Beautifully plated, appetizing, high-end restaurant presentation, soft natural lighting, shallow depth of field, on a rustic wooden table with elegant garnishes. Professional food magazine quality.";
+
+          const result = await generateImage({
+            prompt,
+          });
+
+          return {
+            success: true,
+            imageUrl: result.url,
+          };
+        } catch (error) {
+          console.error("Image generation error:", error);
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to generate image",
+            imageUrl: null,
           };
         }
       }),

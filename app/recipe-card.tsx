@@ -67,7 +67,7 @@ export default function RecipeCardScreen() {
   
   // Parse steps - handle both string array (demo recipes) and Step object array (AI-generated)
   const rawSteps = params.steps ? JSON.parse(params.steps) : [];
-  const steps: Step[] = rawSteps.map((step: string | Step, index: number) => {
+  const steps: Step[] = rawSteps.map((step: unknown, index: number) => {
     if (typeof step === "string") {
       // Demo recipes have simple string steps
       return {
@@ -76,7 +76,13 @@ export default function RecipeCardScreen() {
       };
     }
     // AI-generated recipes have Step objects
-    return step;
+    const stepObj = step as Record<string, unknown>;
+    return {
+      stepNumber: typeof stepObj.stepNumber === "number" ? stepObj.stepNumber : index + 1,
+      instruction: typeof stepObj.instruction === "string" ? stepObj.instruction : String(stepObj.instruction || `Step ${index + 1}`),
+      duration: typeof stepObj.duration === "number" ? stepObj.duration : undefined,
+      tips: typeof stepObj.tips === "string" ? stepObj.tips : undefined,
+    };
   });
 
   const [expandedSection, setExpandedSection] = useState<"ingredients" | "steps" | null>("ingredients");
@@ -95,6 +101,7 @@ export default function RecipeCardScreen() {
   // tRPC mutations
   const uploadImage = trpc.recipe.uploadImage.useMutation();
   const saveRecipe = trpc.recipe.save.useMutation();
+  const generateAIImage = trpc.recipe.generateImage.useMutation();
 
   const handleGenerateAIPhoto = async () => {
     if (Platform.OS !== "web") {
@@ -103,26 +110,29 @@ export default function RecipeCardScreen() {
     
     setIsGeneratingPhoto(true);
     
-    // Mock AI photo generation - in production this would call Flux/DALL-E/etc.
     try {
-      // Simulate generation delay
-      await new Promise(resolve => setTimeout(resolve, 2500));
+      // Call real AI image generation endpoint
+      const result = await generateAIImage.mutateAsync({
+        dishName: params.dishName || "delicious dish",
+        description: params.description || undefined,
+        cuisine: params.cuisine || undefined,
+      });
       
-      // Use a placeholder food image for now
-      // In production: call AI image generation API with dish name
-      const mockGeneratedUrl = `https://source.unsplash.com/800x800/?${encodeURIComponent(params.dishName || "food")},dish,cooking`;
-      
-      setGeneratedPhotoUri(mockGeneratedUrl);
-      
-      if (Platform.OS !== "web") {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (result.success && result.imageUrl) {
+        setGeneratedPhotoUri(result.imageUrl);
+        
+        if (Platform.OS !== "web") {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+        
+        Alert.alert(
+          "Photo Generated! ✨",
+          `AI has created a beautiful photo for "${params.dishName}".`,
+          [{ text: "Nice!" }]
+        );
+      } else {
+        throw new Error(result.error || "Failed to generate image");
       }
-      
-      Alert.alert(
-        "Photo Generated! ✨",
-        `AI has created a beautiful photo for "${params.dishName}".`,
-        [{ text: "Nice!" }]
-      );
     } catch (error) {
       console.error("Photo generation error:", error);
       
@@ -187,6 +197,10 @@ export default function RecipeCardScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
     
+    // Use generated AI photo if available, otherwise original image
+    // This ensures text recipe photos are replaced with AI-generated food images
+    const videoImageUri = generatedPhotoUri || displayImageUri;
+    
     // Navigate to paywall with recipe data
     router.push({
       pathname: "/paywall" as any,
@@ -200,7 +214,8 @@ export default function RecipeCardScreen() {
           prepTime: params.prepTime,
           cookTime: params.cookTime,
         }),
-        imageUri: params.imageUri,
+        imageUri: videoImageUri,
+        hasGeneratedPhoto: generatedPhotoUri ? "true" : "false",
       },
     });
   };
