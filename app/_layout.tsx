@@ -15,12 +15,30 @@ import {
   initialWindowMetrics,
 } from "react-native-safe-area-context";
 import type { EdgeInsets, Metrics, Rect } from "react-native-safe-area-context";
+import { useFonts } from "expo-font";
+import * as SplashScreen from "expo-splash-screen";
+
+// Import Google Fonts
+import {
+  PlayfairDisplay_400Regular,
+  PlayfairDisplay_700Bold,
+} from "@expo-google-fonts/playfair-display";
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+} from "@expo-google-fonts/inter";
+import {
+  Caveat_400Regular,
+} from "@expo-google-fonts/caveat";
 
 import { trpc, createTRPCClient } from "@/lib/trpc";
 import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-runtime";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
+
+// Prevent splash screen from auto-hiding
+SplashScreen.preventAutoHideAsync();
 
 export const unstable_settings = {
   anchor: "(tabs)",
@@ -33,10 +51,26 @@ export default function RootLayout() {
   const [insets, setInsets] = useState<EdgeInsets>(initialInsets);
   const [frame, setFrame] = useState<Rect>(initialFrame);
 
+  // Load custom fonts
+  const [fontsLoaded] = useFonts({
+    PlayfairDisplay: PlayfairDisplay_400Regular,
+    "PlayfairDisplay-Bold": PlayfairDisplay_700Bold,
+    Inter: Inter_400Regular,
+    "Inter-Medium": Inter_500Medium,
+    Caveat: Caveat_400Regular,
+  });
+
   // Initialize Manus runtime for cookie injection from parent container
   useEffect(() => {
     initManusRuntime();
   }, []);
+
+  // Hide splash screen when fonts are loaded
+  useEffect(() => {
+    if (fontsLoaded) {
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded]);
 
   const handleSafeAreaUpdate = useCallback((metrics: Metrics) => {
     setInsets(metrics.insets);
@@ -78,6 +112,11 @@ export default function RootLayout() {
     };
   }, [initialInsets, initialFrame]);
 
+  // Don't render until fonts are loaded
+  if (!fontsLoaded) {
+    return null;
+  }
+
   const content = (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <trpc.Provider client={trpcClient} queryClient={queryClient}>
@@ -87,9 +126,12 @@ export default function RootLayout() {
           {/* in order for ios apps tab switching to work properly, use presentation: "fullScreenModal" for login page, whenever you decide to use presentation: "modal*/}
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="onboarding" options={{ presentation: "fullScreenModal" }} />
+            <Stack.Screen name="login" options={{ presentation: "fullScreenModal" }} />
+            <Stack.Screen name="signup" options={{ presentation: "fullScreenModal" }} />
             <Stack.Screen name="oauth/callback" />
           </Stack>
-          <StatusBar style="auto" />
+          <StatusBar style="light" />
         </QueryClientProvider>
       </trpc.Provider>
     </GestureHandlerRootView>

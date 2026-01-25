@@ -22,6 +22,23 @@ module.exports = {
   theme: {
     extend: {
       colors: tailwindColors,
+      fontFamily: {
+        // Serif - elegant headings
+        serif: ["PlayfairDisplay", "serif"],
+        "serif-bold": ["PlayfairDisplay-Bold", "serif"],
+        // Sans-serif - readable body text
+        sans: ["Inter", "system-ui", "sans-serif"],
+        "sans-medium": ["Inter-Medium", "system-ui", "sans-serif"],
+        // Handwritten - personal notes
+        handwritten: ["Caveat", "cursive"],
+      },
+      borderRadius: {
+        "2xl": "16px",
+        "3xl": "24px",
+      },
+      backdropBlur: {
+        glass: "20px",
+      },
     },
   },
   plugins: [
