@@ -21,14 +21,17 @@
 - [x] Generate custom app logo
 - [x] Configure app branding (name, icons)
 
-## Phase 2: Core Flow (Future)
+## Phase 2: Core Flow
 
-- [ ] Home Screen with recipe grid
-- [ ] Capture Screen (camera + gallery)
-- [ ] Input Details Screen
-- [ ] Processing Screen with progress
-- [ ] Refinement Screen (clarification questions)
-- [ ] Recipe Card Screen
+- [x] Install expo-camera and expo-image-picker dependencies
+- [x] Build Capture Screen with camera view
+- [x] Add gallery picker to Capture Screen
+- [x] Build Input Details Screen (dish name + user notes)
+- [x] Build Processing Screen with loading animation
+- [x] Set up navigation flow between capture screens
+- [ ] Home Screen with recipe grid (future)
+- [ ] Refinement Screen (clarification questions) (future)
+- [ ] Recipe Card Screen (future)
 
 ## Phase 3: Collection (Future)
 

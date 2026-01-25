@@ -1,14 +1,15 @@
-import { Text, TouchableOpacity, ActivityIndicator, View, StyleSheet } from "react-native";
+import { Text, TouchableOpacity, ActivityIndicator, View, StyleSheet, ViewStyle } from "react-native";
 import * as Haptics from "expo-haptics";
 import { Platform } from "react-native";
 
-interface SecondaryButtonProps {
+export interface SecondaryButtonProps {
   title: string;
   onPress: () => void;
   disabled?: boolean;
   loading?: boolean;
   icon?: React.ReactNode;
   fullWidth?: boolean;
+  style?: ViewStyle;
 }
 
 export function SecondaryButton({
@@ -18,6 +19,7 @@ export function SecondaryButton({
   loading = false,
   icon,
   fullWidth = false,
+  style,
 }: SecondaryButtonProps) {
   const handlePress = () => {
     if (Platform.OS !== "web") {
@@ -35,6 +37,7 @@ export function SecondaryButton({
         styles.button,
         fullWidth && styles.fullWidth,
         (disabled || loading) && styles.disabled,
+        style,
       ]}
     >
       {loading ? (
