@@ -16,6 +16,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { RecipeCard } from "@/components/recipe-card";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { trpc } from "@/lib/trpc";
+import { DEMO_RECIPES } from "@/lib/demo-recipes";
 
 export default function CollectionScreen() {
   const router = useRouter();
@@ -42,7 +43,24 @@ export default function CollectionScreen() {
     },
   });
 
-  const recipes = data?.recipes || [];
+  // Use demo recipes if database is empty
+  const dbRecipes = data?.recipes || [];
+  const recipes = dbRecipes.length > 0 ? dbRecipes : DEMO_RECIPES.map((demo) => ({
+    id: demo.id,
+    dishName: demo.title,
+    description: demo.description,
+    cuisine: demo.cuisine,
+    category: demo.category,
+    difficulty: demo.difficulty,
+    prepTime: demo.prepTime,
+    cookTime: demo.cookTime,
+    servings: demo.servings,
+    imageUrl: demo.imageUrl,
+    ingredients: JSON.stringify(demo.ingredients),
+    steps: JSON.stringify(demo.steps),
+    tags: JSON.stringify(demo.tags),
+    isFavorite: demo.isFavorite,
+  }));
 
   const handleRecipePress = (recipe: typeof recipes[0]) => {
     if (Platform.OS !== "web") {

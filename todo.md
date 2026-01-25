@@ -85,3 +85,9 @@
 - [x] Build Video Player Screen with step-by-step playback
 - [x] Add navigation between video steps (prev/next)
 - [x] Mock payment and generation for now
+
+## iOS Testing Preparation
+
+- [x] Add demo recipes for testing the full flow
+- [x] Verify app builds correctly for iOS
+- [x] Provide Expo Go testing instructions

@@ -18,6 +18,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { RecipeCard } from "@/components/recipe-card";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { trpc } from "@/lib/trpc";
+import { DEMO_RECIPES } from "@/lib/demo-recipes";
 
 const CATEGORIES = ["All", "Main", "Soup", "Dessert", "Favorites"];
 
@@ -48,7 +49,33 @@ export default function HomeScreen() {
     },
   });
 
-  const recipes = data?.recipes || [];
+  // Use demo recipes if database is empty
+  const dbRecipes = data?.recipes || [];
+  const recipes = dbRecipes.length > 0 ? dbRecipes : DEMO_RECIPES.map((demo) => ({
+    id: demo.id,
+    dishName: demo.title,
+    description: demo.description,
+    cuisine: demo.cuisine,
+    category: demo.category,
+    difficulty: demo.difficulty,
+    prepTime: demo.prepTime,
+    cookTime: demo.cookTime,
+    servings: demo.servings,
+    imageUrl: demo.imageUrl,
+    ingredients: JSON.stringify(demo.ingredients),
+    steps: JSON.stringify(demo.steps),
+    tags: JSON.stringify(demo.tags),
+    isFavorite: demo.isFavorite,
+  })).filter((recipe) => {
+    // Apply category filter
+    if (selectedCategory === "All") return true;
+    if (selectedCategory === "Favorites") return recipe.isFavorite;
+    return recipe.category === selectedCategory;
+  }).filter((recipe) => {
+    // Apply search filter
+    if (!searchQuery) return true;
+    return recipe.dishName.toLowerCase().includes(searchQuery.toLowerCase());
+  });
 
   const handleCategoryPress = (category: string) => {
     if (Platform.OS !== "web") {
