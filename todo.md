@@ -29,9 +29,12 @@
 - [x] Build Input Details Screen (dish name + user notes)
 - [x] Build Processing Screen with loading animation
 - [x] Set up navigation flow between capture screens
+- [x] Configure Anthropic API key
+- [x] Create analyze-image tRPC route with Claude Vision
+- [x] Build Recipe Card Screen with glassmorphism design
+- [x] Connect Processing Screen to tRPC AI route
 - [ ] Home Screen with recipe grid (future)
 - [ ] Refinement Screen (clarification questions) (future)
-- [ ] Recipe Card Screen (future)
 
 ## Phase 3: Collection (Future)
 

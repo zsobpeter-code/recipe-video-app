@@ -39,6 +39,15 @@ const MAPPING = {
   "checkmark": "check",
   "play.fill": "play-arrow",
   "pause.fill": "pause",
+  
+  // Recipe card icons
+  "list.bullet": "format-list-bulleted",
+  "list.number": "format-list-numbered",
+  "chevron.up": "keyboard-arrow-up",
+  "chevron.down": "keyboard-arrow-down",
+  "bookmark.fill": "bookmark",
+  "video.fill": "videocam",
+  "star.fill": "star",
 } as IconMapping;
 
 /**

@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { useEffect, useState, useRef } from "react";
+import { View, Text, StyleSheet, Platform } from "react-native";
 import { Image } from "expo-image";
 import { useRouter, useLocalSearchParams } from "expo-router";
+import * as FileSystem from "expo-file-system/legacy";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -10,16 +11,16 @@ import Animated, {
   withSequence,
   withDelay,
   Easing,
-  interpolate,
 } from "react-native-reanimated";
 
 import { ScreenContainer } from "@/components/screen-container";
+import { trpc } from "@/lib/trpc";
 
 const PROCESSING_STEPS = [
-  { id: 1, text: "Analyzing image...", duration: 2000 },
-  { id: 2, text: "Identifying ingredients...", duration: 2500 },
-  { id: 3, text: "Extracting recipe steps...", duration: 2000 },
-  { id: 4, text: "Generating cooking tips...", duration: 1500 },
+  { id: 1, text: "Analyzing image...", duration: 3000 },
+  { id: 2, text: "Identifying ingredients...", duration: 4000 },
+  { id: 3, text: "Extracting recipe steps...", duration: 4000 },
+  { id: 4, text: "Generating cooking tips...", duration: 3000 },
 ];
 
 export default function ProcessingScreen() {
@@ -32,6 +33,8 @@ export default function ProcessingScreen() {
   }>();
   
   const [currentStep, setCurrentStep] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const hasStartedAnalysis = useRef(false);
   
   // Animation values
   const rotation = useSharedValue(0);
@@ -40,6 +43,45 @@ export default function ProcessingScreen() {
   const dot1Opacity = useSharedValue(0.3);
   const dot2Opacity = useSharedValue(0.3);
   const dot3Opacity = useSharedValue(0.3);
+
+  // tRPC mutation for recipe analysis
+  const analyzeRecipe = trpc.recipe.analyze.useMutation({
+    onSuccess: (data) => {
+      if (data.success && data.recipe) {
+        // Navigate to recipe card with the AI results
+        router.replace({
+          pathname: "/recipe-card" as any,
+          params: {
+            imageUri: params.imageUri || "",
+            dishName: data.recipe.dishName,
+            description: data.recipe.description,
+            cuisine: data.recipe.cuisine || "",
+            difficulty: data.recipe.difficulty,
+            prepTime: String(data.recipe.prepTime),
+            cookTime: String(data.recipe.cookTime),
+            servings: String(data.recipe.servings),
+            ingredients: JSON.stringify(data.recipe.ingredients),
+            steps: JSON.stringify(data.recipe.steps),
+            tags: JSON.stringify(data.recipe.tags || []),
+          },
+        });
+      } else {
+        setError(data.error || "Failed to analyze recipe");
+        // Navigate back after showing error
+        setTimeout(() => {
+          router.back();
+        }, 3000);
+      }
+    },
+    onError: (err) => {
+      console.error("Recipe analysis error:", err);
+      setError(err.message || "Failed to analyze recipe");
+      // Navigate back after showing error
+      setTimeout(() => {
+        router.back();
+      }, 3000);
+    },
+  });
 
   // Rotating animation
   useEffect(() => {
@@ -99,9 +141,8 @@ export default function ProcessingScreen() {
     animateDots();
   }, []);
 
-  // Progress through steps
+  // Progress through steps animation
   useEffect(() => {
-    let stepIndex = 0;
     const totalDuration = PROCESSING_STEPS.reduce((acc, step) => acc + step.duration, 0);
     
     // Animate progress bar
@@ -119,18 +160,59 @@ export default function ProcessingScreen() {
       accumulatedTime += step.duration;
     });
 
-    // Navigate to results after all steps complete
-    const finalTimer = setTimeout(() => {
-      // For now, just go back to home since we haven't built the recipe card screen yet
-      // In the future, this would navigate to the recipe card screen with the AI results
-      router.replace("/(tabs)");
-    }, totalDuration + 500);
-
     return () => {
       stepTimers.forEach(clearTimeout);
-      clearTimeout(finalTimer);
     };
   }, []);
+
+  // Start AI analysis
+  useEffect(() => {
+    if (hasStartedAnalysis.current) return;
+    hasStartedAnalysis.current = true;
+
+    const analyzeImage = async () => {
+      try {
+        let imageBase64 = "";
+        
+        if (params.imageUri) {
+          if (Platform.OS === "web") {
+            // On web, fetch the image and convert to base64
+            const response = await fetch(params.imageUri);
+            const blob = await response.blob();
+            imageBase64 = await new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => {
+                const result = reader.result as string;
+                // Remove the data URL prefix
+                resolve(result.split(",")[1] || "");
+              };
+              reader.readAsDataURL(blob);
+            });
+          } else {
+            // On native, use FileSystem
+            imageBase64 = await FileSystem.readAsStringAsync(params.imageUri, {
+              encoding: FileSystem.EncodingType.Base64,
+            });
+          }
+        }
+
+        // Call the AI analysis endpoint
+        analyzeRecipe.mutate({
+          imageBase64,
+          dishName: params.dishName || undefined,
+          userNotes: params.userNotes || undefined,
+        });
+      } catch (err) {
+        console.error("Error preparing image:", err);
+        setError("Failed to prepare image for analysis");
+        setTimeout(() => {
+          router.back();
+        }, 3000);
+      }
+    };
+
+    analyzeImage();
+  }, [params.imageUri, params.dishName, params.userNotes]);
 
   const rotationStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rotation.value}deg` }],
@@ -178,7 +260,7 @@ export default function ProcessingScreen() {
           
           {/* Pulsing center icon */}
           <Animated.View style={[styles.centerIcon, pulseStyle]}>
-            <Text style={styles.centerIconText}>🍳</Text>
+            <Text style={styles.centerIconText}>{error ? "❌" : "🍳"}</Text>
           </Animated.View>
         </View>
 
@@ -188,34 +270,48 @@ export default function ProcessingScreen() {
             {params.dishName || "Analyzing Recipe"}
           </Text>
           
-          {/* Current step with animated dots */}
-          <View style={styles.stepContainer}>
-            <Text style={[styles.stepText, { fontFamily: "Inter" }]}>
-              {PROCESSING_STEPS[currentStep]?.text || "Processing..."}
-            </Text>
-            <View style={styles.dotsContainer}>
-              <Animated.View style={[styles.dot, dot1Style]} />
-              <Animated.View style={[styles.dot, dot2Style]} />
-              <Animated.View style={[styles.dot, dot3Style]} />
+          {/* Error or current step */}
+          {error ? (
+            <View style={styles.errorContainer}>
+              <Text style={[styles.errorText, { fontFamily: "Inter" }]}>
+                {error}
+              </Text>
+              <Text style={[styles.errorSubtext, { fontFamily: "Inter" }]}>
+                Returning to previous screen...
+              </Text>
             </View>
-          </View>
+          ) : (
+            <>
+              {/* Current step with animated dots */}
+              <View style={styles.stepContainer}>
+                <Text style={[styles.stepText, { fontFamily: "Inter" }]}>
+                  {PROCESSING_STEPS[currentStep]?.text || "Processing..."}
+                </Text>
+                <View style={styles.dotsContainer}>
+                  <Animated.View style={[styles.dot, dot1Style]} />
+                  <Animated.View style={[styles.dot, dot2Style]} />
+                  <Animated.View style={[styles.dot, dot3Style]} />
+                </View>
+              </View>
 
-          {/* Progress bar */}
-          <View style={styles.progressContainer}>
-            <View style={styles.progressTrack}>
-              <Animated.View style={[styles.progressFill, progressStyle]} />
-            </View>
-            <Text style={[styles.progressText, { fontFamily: "Inter" }]}>
-              Step {currentStep + 1} of {PROCESSING_STEPS.length}
-            </Text>
-          </View>
+              {/* Progress bar */}
+              <View style={styles.progressContainer}>
+                <View style={styles.progressTrack}>
+                  <Animated.View style={[styles.progressFill, progressStyle]} />
+                </View>
+                <Text style={[styles.progressText, { fontFamily: "Inter" }]}>
+                  Step {currentStep + 1} of {PROCESSING_STEPS.length}
+                </Text>
+              </View>
 
-          {/* Fun tip */}
-          <View style={styles.tipContainer}>
-            <Text style={[styles.tipText, { fontFamily: "Caveat" }]}>
-              ✨ Our AI is working its magic to extract every delicious detail!
-            </Text>
-          </View>
+              {/* Fun tip */}
+              <View style={styles.tipContainer}>
+                <Text style={[styles.tipText, { fontFamily: "Caveat" }]}>
+                  ✨ Our AI is working its magic to extract every delicious detail!
+                </Text>
+              </View>
+            </>
+          )}
         </View>
       </View>
     </ScreenContainer>
@@ -331,5 +427,19 @@ const styles = StyleSheet.create({
     color: "#C9A962",
     textAlign: "center",
     lineHeight: 24,
+  },
+  errorContainer: {
+    alignItems: "center",
+    gap: 8,
+  },
+  errorText: {
+    fontSize: 16,
+    color: "#EF4444",
+    textAlign: "center",
+  },
+  errorSubtext: {
+    fontSize: 14,
+    color: "#888888",
+    textAlign: "center",
   },
 });
