@@ -12,7 +12,12 @@
 - [x] Create Onboarding screen with carousel
 - [x] Create Login screen
 - [x] Create Sign Up screen
-- [ ] Implement auth flow with Supabase
+- [x] Configure Supabase credentials
+- [x] Create database tables (users, recipes, recipe_photos, generations, transactions)
+- [x] Set up Row Level Security (RLS) policies
+- [x] Implement Supabase auth client and hooks
+- [x] Connect Apple Sign In to auth flow
+- [x] Update Login/Sign Up screens with real authentication
 - [x] Generate custom app logo
 - [x] Configure app branding (name, icons)
 

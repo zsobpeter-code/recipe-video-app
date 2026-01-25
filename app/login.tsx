@@ -4,12 +4,16 @@ import { useState } from "react";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { GlassmorphismCard, TextInput, PrimaryButton, SecondaryButton, IconSymbol } from "@/components/ui";
+import { useAuth } from "@/lib/auth-provider";
+import { signInWithApple } from "@/lib/apple-auth";
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { signInWithEmail } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
   const [error, setError] = useState("");
 
   const handleLogin = async () => {
@@ -21,17 +25,30 @@ export default function LoginScreen() {
     setLoading(true);
     setError("");
     
-    // TODO: Implement actual authentication with Supabase
-    // For now, simulate a login
-    setTimeout(() => {
-      setLoading(false);
+    const { error: authError } = await signInWithEmail(email, password);
+    
+    setLoading(false);
+    
+    if (authError) {
+      setError(authError.message);
+    } else {
       router.replace("/(tabs)");
-    }, 1000);
+    }
   };
 
-  const handleAppleSignIn = () => {
-    // TODO: Implement Apple Sign In
-    router.replace("/(tabs)");
+  const handleAppleSignIn = async () => {
+    setAppleLoading(true);
+    setError("");
+    
+    const result = await signInWithApple();
+    
+    setAppleLoading(false);
+    
+    if (result.success) {
+      router.replace("/(tabs)");
+    } else if (result.error && result.error !== "Sign in was cancelled") {
+      setError(result.error);
+    }
   };
 
   return (
@@ -127,15 +144,17 @@ export default function LoginScreen() {
 
               <TouchableOpacity
                 onPress={handleAppleSignIn}
+                disabled={appleLoading}
                 className="w-full bg-foreground rounded-xl py-4 items-center"
                 activeOpacity={0.8}
+                style={{ opacity: appleLoading ? 0.7 : 1 }}
               >
                 <View className="flex-row items-center gap-2">
                   <Text style={{ fontFamily: "Inter-Medium", fontSize: 20 }} className="text-background">
                     
                   </Text>
                   <Text style={{ fontFamily: "Inter-Medium" }} className="text-background text-base">
-                    Sign in with Apple
+                    {appleLoading ? "Signing in..." : "Sign in with Apple"}
                   </Text>
                 </View>
               </TouchableOpacity>

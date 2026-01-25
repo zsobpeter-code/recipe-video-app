@@ -4,15 +4,18 @@ import { useState } from "react";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { GlassmorphismCard, TextInput, PrimaryButton, IconSymbol } from "@/components/ui";
+import { useAuth } from "@/lib/auth-provider";
 
 export default function SignUpScreen() {
   const router = useRouter();
+  const { signUpWithEmail } = useAuth();
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
 
   const handleSignUp = async () => {
     if (!displayName || !email || !password || !confirmPassword) {
@@ -33,13 +36,53 @@ export default function SignUpScreen() {
     setLoading(true);
     setError("");
     
-    // TODO: Implement actual registration with Supabase
-    // For now, simulate a signup
-    setTimeout(() => {
-      setLoading(false);
-      router.replace("/(tabs)");
-    }, 1000);
+    const { error: authError } = await signUpWithEmail(email, password, displayName);
+    
+    setLoading(false);
+    
+    if (authError) {
+      setError(authError.message);
+    } else {
+      // Show success message - user may need to verify email
+      setSuccess(true);
+    }
   };
+
+  if (success) {
+    return (
+      <ScreenContainer edges={["top", "bottom", "left", "right"]}>
+        <View className="flex-1 items-center justify-center p-6">
+          <GlassmorphismCard className="items-center gap-6">
+            <View 
+              className="w-20 h-20 rounded-full items-center justify-center"
+              style={{ backgroundColor: "rgba(74, 124, 89, 0.2)" }}
+            >
+              <IconSymbol name="checkmark" size={40} color="#4A7C59" />
+            </View>
+            <View className="gap-2 items-center">
+              <Text 
+                style={{ fontFamily: "PlayfairDisplay-Bold" }} 
+                className="text-2xl text-foreground text-center"
+              >
+                Account Created!
+              </Text>
+              <Text 
+                style={{ fontFamily: "Inter" }} 
+                className="text-base text-muted text-center"
+              >
+                Please check your email to verify your account, then sign in.
+              </Text>
+            </View>
+            <PrimaryButton
+              title="Go to Sign In"
+              onPress={() => router.replace("/login")}
+              fullWidth
+            />
+          </GlassmorphismCard>
+        </View>
+      </ScreenContainer>
+    );
+  }
 
   return (
     <ScreenContainer edges={["top", "bottom", "left", "right"]}>
