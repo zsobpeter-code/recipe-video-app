@@ -82,6 +82,11 @@ export default function RecipeCardScreen() {
   const [expandedSection, setExpandedSection] = useState<"ingredients" | "steps" | null>("ingredients");
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(!!params.recipeId);
+  const [isGeneratingPhoto, setIsGeneratingPhoto] = useState(false);
+  const [generatedPhotoUri, setGeneratedPhotoUri] = useState<string | null>(null);
+  
+  // Check if we have a food photo or just text recipe
+  const hasPhoto = !!params.imageUri && !params.imageUri.includes("placeholder");
   
   // Animation values
   const ingredientsHeight = useSharedValue(1);
@@ -90,6 +95,53 @@ export default function RecipeCardScreen() {
   // tRPC mutations
   const uploadImage = trpc.recipe.uploadImage.useMutation();
   const saveRecipe = trpc.recipe.save.useMutation();
+
+  const handleGenerateAIPhoto = async () => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+    
+    setIsGeneratingPhoto(true);
+    
+    // Mock AI photo generation - in production this would call Flux/DALL-E/etc.
+    try {
+      // Simulate generation delay
+      await new Promise(resolve => setTimeout(resolve, 2500));
+      
+      // Use a placeholder food image for now
+      // In production: call AI image generation API with dish name
+      const mockGeneratedUrl = `https://source.unsplash.com/800x800/?${encodeURIComponent(params.dishName || "food")},dish,cooking`;
+      
+      setGeneratedPhotoUri(mockGeneratedUrl);
+      
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      
+      Alert.alert(
+        "Photo Generated! ✨",
+        `AI has created a beautiful photo for "${params.dishName}".`,
+        [{ text: "Nice!" }]
+      );
+    } catch (error) {
+      console.error("Photo generation error:", error);
+      
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
+      
+      Alert.alert(
+        "Generation Failed",
+        "Unable to generate photo. Please try again.",
+        [{ text: "OK" }]
+      );
+    } finally {
+      setIsGeneratingPhoto(false);
+    }
+  };
+
+  // Use generated photo if available, otherwise original
+  const displayImageUri = generatedPhotoUri || params.imageUri;
 
   const toggleSection = (section: "ingredients" | "steps") => {
     if (Platform.OS !== "web") {
@@ -268,12 +320,19 @@ export default function RecipeCardScreen() {
     <View style={styles.container}>
       {/* Full-screen background image */}
       <View style={styles.imageContainer}>
-        {params.imageUri && (
+        {displayImageUri ? (
           <Image
-            source={{ uri: params.imageUri }}
+            source={{ uri: displayImageUri }}
             style={styles.backgroundImage}
             contentFit="cover"
           />
+        ) : (
+          <View style={styles.noPhotoContainer}>
+            <IconSymbol name="doc.text.fill" size={64} color="#444444" />
+            <Text style={[styles.noPhotoText, { fontFamily: "Inter" }]}>
+              Text Recipe
+            </Text>
+          </View>
         )}
         {/* Vignette overlay */}
         <LinearGradient
@@ -281,6 +340,37 @@ export default function RecipeCardScreen() {
           locations={[0, 0.3, 0.6, 0.85]}
           style={styles.vignette}
         />
+        
+        {/* Generate AI Photo button - shown when no food photo */}
+        {!hasPhoto && !generatedPhotoUri && (
+          <TouchableOpacity
+            style={styles.generatePhotoButton}
+            onPress={handleGenerateAIPhoto}
+            disabled={isGeneratingPhoto}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={["rgba(201,169,98,0.9)", "rgba(168,139,74,0.9)"]}
+              style={styles.generatePhotoGradient}
+            >
+              {isGeneratingPhoto ? (
+                <>
+                  <ActivityIndicator size="small" color="#1A1A1A" />
+                  <Text style={[styles.generatePhotoText, { fontFamily: "Inter-Medium" }]}>
+                    Generating...
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <IconSymbol name="sparkles" size={20} color="#1A1A1A" />
+                  <Text style={[styles.generatePhotoText, { fontFamily: "Inter-Medium" }]}>
+                    Generate AI Photo
+                  </Text>
+                </>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Header */}
@@ -507,6 +597,37 @@ const styles = StyleSheet.create({
   backgroundImage: {
     width: "100%",
     height: "100%",
+  },
+  noPhotoContainer: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#2A2A2A",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+  },
+  noPhotoText: {
+    fontSize: 16,
+    color: "#666666",
+  },
+  generatePhotoButton: {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    transform: [{ translateX: -80 }, { translateY: -24 }],
+    zIndex: 5,
+  },
+  generatePhotoGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 24,
+  },
+  generatePhotoText: {
+    fontSize: 15,
+    color: "#1A1A1A",
   },
   vignette: {
     ...StyleSheet.absoluteFillObject,

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { 
   View, 
   Text, 
@@ -11,17 +11,27 @@ import {
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withRepeat,
+  withSequence,
+  Easing,
+  cancelAnimation,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 interface RecipeStep {
   number: number;
   instruction: string;
-  duration?: string;
+  duration: string;
+  durationSeconds: number;
 }
 
 export default function VideoPlayerScreen() {
@@ -36,6 +46,14 @@ export default function VideoPlayerScreen() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [steps, setSteps] = useState<RecipeStep[]>([]);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Ken Burns animation values
+  const scale = useSharedValue(1);
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
 
   // Parse recipe data
   useEffect(() => {
@@ -46,17 +64,26 @@ export default function VideoPlayerScreen() {
         const parsedSteps: RecipeStep[] = rawSteps.map(
           (step: string | { stepNumber?: number; instruction: string; duration?: number }, index: number) => {
             // Handle both string steps and object steps
+            const durationSecs = typeof step === 'object' && step.duration 
+              ? step.duration 
+              : Math.floor(Math.random() * 120) + 30; // 30-150 seconds
+            
+            const mins = Math.floor(durationSecs / 60);
+            const secs = durationSecs % 60;
+            
             if (typeof step === 'string') {
               return {
                 number: index + 1,
                 instruction: step,
-                duration: `${Math.floor(Math.random() * 3) + 1}:${String(Math.floor(Math.random() * 60)).padStart(2, "0")}`,
+                duration: `${mins}:${String(secs).padStart(2, "0")}`,
+                durationSeconds: durationSecs,
               };
             }
             return {
               number: step.stepNumber || index + 1,
               instruction: step.instruction,
-              duration: step.duration ? `${Math.floor(step.duration / 60)}:${String(step.duration % 60).padStart(2, "0")}` : `${Math.floor(Math.random() * 3) + 1}:${String(Math.floor(Math.random() * 60)).padStart(2, "0")}`,
+              duration: `${mins}:${String(secs).padStart(2, "0")}`,
+              durationSeconds: durationSecs,
             };
           }
         );
@@ -68,26 +95,131 @@ export default function VideoPlayerScreen() {
       } catch (error) {
         // Fallback mock steps
         setSteps([
-          { number: 1, instruction: "Gather all ingredients and prep your workspace", duration: "0:30" },
-          { number: 2, instruction: "Heat the pan over medium heat with oil", duration: "1:00" },
-          { number: 3, instruction: "Add the main ingredients and cook until golden", duration: "3:00" },
-          { number: 4, instruction: "Season with salt, pepper, and herbs", duration: "0:45" },
-          { number: 5, instruction: "Plate and garnish before serving", duration: "1:15" },
+          { number: 1, instruction: "Gather all ingredients and prep your workspace", duration: "0:30", durationSeconds: 30 },
+          { number: 2, instruction: "Heat the pan over medium heat with oil", duration: "1:00", durationSeconds: 60 },
+          { number: 3, instruction: "Add the main ingredients and cook until golden", duration: "3:00", durationSeconds: 180 },
+          { number: 4, instruction: "Season with salt, pepper, and herbs", duration: "0:45", durationSeconds: 45 },
+          { number: 5, instruction: "Plate and garnish before serving", duration: "1:15", durationSeconds: 75 },
         ]);
       }
     } else {
       // Mock steps if no data
       setSteps([
-        { number: 1, instruction: "Gather all ingredients and prep your workspace", duration: "0:30" },
-        { number: 2, instruction: "Heat the pan over medium heat with oil", duration: "1:00" },
-        { number: 3, instruction: "Add the main ingredients and cook until golden", duration: "3:00" },
-        { number: 4, instruction: "Season with salt, pepper, and herbs", duration: "0:45" },
-        { number: 5, instruction: "Plate and garnish before serving", duration: "1:15" },
+        { number: 1, instruction: "Gather all ingredients and prep your workspace", duration: "0:30", durationSeconds: 30 },
+        { number: 2, instruction: "Heat the pan over medium heat with oil", duration: "1:00", durationSeconds: 60 },
+        { number: 3, instruction: "Add the main ingredients and cook until golden", duration: "3:00", durationSeconds: 180 },
+        { number: 4, instruction: "Season with salt, pepper, and herbs", duration: "0:45", durationSeconds: 45 },
+        { number: 5, instruction: "Plate and garnish before serving", duration: "1:15", durationSeconds: 75 },
       ]);
     }
   }, [params.recipeData]);
 
+  // Ken Burns effect - slow zoom and pan animation
+  useEffect(() => {
+    if (isPlaying) {
+      // Start Ken Burns animation
+      const duration = 8000; // 8 seconds per cycle
+      
+      // Zoom in slowly while panning
+      scale.value = withRepeat(
+        withSequence(
+          withTiming(1.15, { duration, easing: Easing.inOut(Easing.ease) }),
+          withTiming(1, { duration, easing: Easing.inOut(Easing.ease) })
+        ),
+        -1,
+        true
+      );
+      
+      // Pan horizontally
+      translateX.value = withRepeat(
+        withSequence(
+          withTiming(15, { duration, easing: Easing.inOut(Easing.ease) }),
+          withTiming(-15, { duration, easing: Easing.inOut(Easing.ease) })
+        ),
+        -1,
+        true
+      );
+      
+      // Pan vertically
+      translateY.value = withRepeat(
+        withSequence(
+          withTiming(10, { duration, easing: Easing.inOut(Easing.ease) }),
+          withTiming(-10, { duration, easing: Easing.inOut(Easing.ease) })
+        ),
+        -1,
+        true
+      );
+    } else {
+      // Reset to initial state when paused
+      cancelAnimation(scale);
+      cancelAnimation(translateX);
+      cancelAnimation(translateY);
+      scale.value = withTiming(1, { duration: 300 });
+      translateX.value = withTiming(0, { duration: 300 });
+      translateY.value = withTiming(0, { duration: 300 });
+    }
+  }, [isPlaying]);
+
+  // Timer effect
+  useEffect(() => {
+    if (isPlaying && steps.length > 0) {
+      timerRef.current = setInterval(() => {
+        setElapsedTime(prev => {
+          const currentStep = steps[currentStepIndex];
+          if (prev >= currentStep.durationSeconds) {
+            // Auto-advance to next step
+            if (currentStepIndex < steps.length - 1) {
+              setCurrentStepIndex(idx => idx + 1);
+              return 0;
+            } else {
+              // End of all steps
+              setIsPlaying(false);
+              return prev;
+            }
+          }
+          return prev + 1;
+        });
+      }, 1000);
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [isPlaying, currentStepIndex, steps]);
+
+  // Reset timer when step changes
+  useEffect(() => {
+    setElapsedTime(0);
+  }, [currentStepIndex]);
+
+  const kenBurnsStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: scale.value },
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+    ],
+  }));
+
   const currentStep = steps[currentStepIndex];
+  
+  // Format elapsed time
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${String(secs).padStart(2, "0")}`;
+  };
+
+  // Calculate progress percentage
+  const progressPercent = currentStep 
+    ? Math.min((elapsedTime / currentStep.durationSeconds) * 100, 100) 
+    : 0;
 
   const handlePlayPause = () => {
     if (Platform.OS !== "web") {
@@ -125,6 +257,7 @@ export default function VideoPlayerScreen() {
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
+    setIsPlaying(false);
     router.back();
   };
 
@@ -164,19 +297,26 @@ export default function VideoPlayerScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Video Preview Area */}
+      {/* Video Preview Area with Ken Burns Effect */}
       <View style={styles.videoContainer}>
-        {params.imageUri ? (
-          <Image
-            source={{ uri: params.imageUri }}
-            style={styles.videoPreview}
-            contentFit="cover"
-          />
-        ) : (
-          <View style={styles.videoPlaceholder}>
-            <IconSymbol name="video.fill" size={48} color="#555555" />
-          </View>
-        )}
+        <View style={styles.videoWrapper}>
+          {params.imageUri ? (
+            <Animated.View style={[styles.kenBurnsContainer, kenBurnsStyle]}>
+              <Image
+                source={{ uri: params.imageUri }}
+                style={styles.videoPreview}
+                contentFit="cover"
+              />
+            </Animated.View>
+          ) : (
+            <View style={styles.videoPlaceholder}>
+              <IconSymbol name="video.fill" size={48} color="#555555" />
+              <Text style={[styles.placeholderText, { fontFamily: "Inter" }]}>
+                Video Preview
+              </Text>
+            </View>
+          )}
+        </View>
         
         {/* Video Overlay */}
         <View style={styles.videoOverlay}>
@@ -187,15 +327,18 @@ export default function VideoPlayerScreen() {
             </Text>
           </View>
 
-          {/* Duration */}
-          {currentStep?.duration && (
-            <View style={styles.durationBadge}>
-              <IconSymbol name="clock.fill" size={14} color="#FFFFFF" />
-              <Text style={[styles.durationText, { fontFamily: "Inter" }]}>
-                {currentStep.duration}
-              </Text>
-            </View>
-          )}
+          {/* Timer */}
+          <View style={styles.timerBadge}>
+            <IconSymbol name="clock.fill" size={14} color="#FFFFFF" />
+            <Text style={[styles.timerText, { fontFamily: "Inter-Medium" }]}>
+              {formatTime(elapsedTime)} / {currentStep?.duration || "0:00"}
+            </Text>
+          </View>
+        </View>
+
+        {/* Progress bar */}
+        <View style={styles.progressBarContainer}>
+          <View style={[styles.progressBar, { width: `${progressPercent}%` }]} />
         </View>
 
         {/* Play button overlay */}
@@ -204,7 +347,7 @@ export default function VideoPlayerScreen() {
           onPress={handlePlayPause}
           activeOpacity={0.8}
         >
-          <View style={styles.playButton}>
+          <View style={[styles.playButton, isPlaying && styles.playButtonPlaying]}>
             <IconSymbol 
               name={isPlaying ? "pause.fill" : "play.fill"} 
               size={32} 
@@ -212,6 +355,16 @@ export default function VideoPlayerScreen() {
             />
           </View>
         </TouchableOpacity>
+
+        {/* Playing indicator */}
+        {isPlaying && (
+          <View style={styles.playingIndicator}>
+            <View style={styles.playingDot} />
+            <Text style={[styles.playingText, { fontFamily: "Inter-Medium" }]}>
+              PLAYING
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Current Step Display */}
@@ -246,7 +399,7 @@ export default function VideoPlayerScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.playPauseButton}
+          style={[styles.playPauseButton, isPlaying && styles.playPauseButtonActive]}
           onPress={handlePlayPause}
           activeOpacity={0.8}
         >
@@ -293,6 +446,7 @@ export default function VideoPlayerScreen() {
               style={[
                 styles.stepItem,
                 index === currentStepIndex && styles.stepItemActive,
+                index < currentStepIndex && styles.stepItemCompleted,
               ]}
               onPress={() => handleStepPress(index)}
               activeOpacity={0.7}
@@ -300,13 +454,13 @@ export default function VideoPlayerScreen() {
               <View style={[
                 styles.stepNumber,
                 index === currentStepIndex && styles.stepNumberActive,
-                index < currentStepIndex && styles.stepNumberComplete,
+                index < currentStepIndex && styles.stepNumberCompleted,
               ]}>
                 {index < currentStepIndex ? (
                   <IconSymbol name="checkmark" size={14} color="#1A1A1A" />
                 ) : (
                   <Text style={[
-                    styles.stepNumberText, 
+                    styles.stepNumberText,
                     { fontFamily: "Inter-Medium" },
                     index === currentStepIndex && styles.stepNumberTextActive,
                   ]}>
@@ -314,10 +468,10 @@ export default function VideoPlayerScreen() {
                   </Text>
                 )}
               </View>
-              <View style={styles.stepContent}>
+              <View style={styles.stepInfo}>
                 <Text 
                   style={[
-                    styles.stepInstruction, 
+                    styles.stepInstruction,
                     { fontFamily: "Inter" },
                     index === currentStepIndex && styles.stepInstructionActive,
                   ]}
@@ -325,11 +479,9 @@ export default function VideoPlayerScreen() {
                 >
                   {step.instruction}
                 </Text>
-                {step.duration && (
-                  <Text style={[styles.stepDuration, { fontFamily: "Inter" }]}>
-                    {step.duration}
-                  </Text>
-                )}
+                <Text style={[styles.stepDuration, { fontFamily: "Inter" }]}>
+                  {step.duration}
+                </Text>
               </View>
             </TouchableOpacity>
           ))}
@@ -350,32 +502,46 @@ const styles = StyleSheet.create({
   headerButton: {
     width: 40,
     height: 40,
-    justifyContent: "center",
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.1)",
     alignItems: "center",
+    justifyContent: "center",
   },
   headerTitle: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 17,
     color: "#FFFFFF",
     textAlign: "center",
-    marginHorizontal: 8,
+    marginHorizontal: 12,
   },
   videoContainer: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_WIDTH * 0.6,
-    backgroundColor: "#1A1A1A",
-    position: "relative",
+    marginHorizontal: 16,
+    borderRadius: 16,
+    overflow: "hidden",
+    backgroundColor: "#2A2A2A",
+    aspectRatio: 16 / 9,
+  },
+  videoWrapper: {
+    flex: 1,
+    overflow: "hidden",
+  },
+  kenBurnsContainer: {
+    width: "100%",
+    height: "100%",
   },
   videoPreview: {
     width: "100%",
     height: "100%",
   },
   videoPlaceholder: {
-    width: "100%",
-    height: "100%",
-    justifyContent: "center",
+    flex: 1,
     alignItems: "center",
-    backgroundColor: "#2A2A2A",
+    justifyContent: "center",
+    gap: 8,
+  },
+  placeholderText: {
+    fontSize: 14,
+    color: "#666666",
   },
   videoOverlay: {
     position: "absolute",
@@ -386,27 +552,39 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   stepBadge: {
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    backgroundColor: "rgba(0,0,0,0.6)",
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 16,
+    borderRadius: 12,
   },
   stepBadgeText: {
     fontSize: 12,
     color: "#FFFFFF",
   },
-  durationBadge: {
+  timerBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    paddingHorizontal: 10,
+    gap: 6,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 16,
+    borderRadius: 12,
   },
-  durationText: {
+  timerText: {
     fontSize: 12,
     color: "#FFFFFF",
+  },
+  progressBarContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 4,
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+  progressBar: {
+    height: "100%",
+    backgroundColor: "#C9A962",
   },
   playButtonOverlay: {
     position: "absolute",
@@ -414,48 +592,66 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "center",
   },
   playButton: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: "rgba(201, 169, 98, 0.9)",
-    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.9)",
     alignItems: "center",
+    justifyContent: "center",
+  },
+  playButtonPlaying: {
+    backgroundColor: "rgba(255,255,255,0.3)",
+  },
+  playingIndicator: {
+    position: "absolute",
+    bottom: 16,
+    left: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  playingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#EF4444",
+  },
+  playingText: {
+    fontSize: 10,
+    color: "#FFFFFF",
+    letterSpacing: 1,
   },
   currentStepContainer: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255, 255, 255, 0.08)",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    gap: 8,
   },
   currentStepLabel: {
     fontSize: 11,
     color: "#C9A962",
     letterSpacing: 1,
-    marginBottom: 8,
   },
   currentStepText: {
-    fontSize: 18,
+    fontSize: 20,
     color: "#FFFFFF",
-    lineHeight: 26,
+    lineHeight: 28,
   },
   navigationControls: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255, 255, 255, 0.08)",
+    paddingVertical: 12,
   },
   navButton: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
     paddingVertical: 8,
-    paddingHorizontal: 4,
   },
   navButtonDisabled: {
     opacity: 0.5,
@@ -472,13 +668,15 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 28,
     backgroundColor: "#C9A962",
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "center",
+  },
+  playPauseButtonActive: {
+    backgroundColor: "#FFFFFF",
   },
   stepsListContainer: {
     flex: 1,
     paddingHorizontal: 16,
-    paddingTop: 16,
   },
   stepsListTitle: {
     fontSize: 11,
@@ -491,46 +689,50 @@ const styles = StyleSheet.create({
   },
   stepItem: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     gap: 12,
     paddingVertical: 12,
     paddingHorizontal: 12,
-    marginBottom: 8,
     borderRadius: 12,
-    backgroundColor: "rgba(255, 255, 255, 0.03)",
+    marginBottom: 8,
+    backgroundColor: "rgba(255,255,255,0.05)",
   },
   stepItemActive: {
-    backgroundColor: "rgba(201, 169, 98, 0.1)",
+    backgroundColor: "rgba(201,169,98,0.15)",
     borderWidth: 1,
-    borderColor: "rgba(201, 169, 98, 0.3)",
+    borderColor: "rgba(201,169,98,0.3)",
+  },
+  stepItemCompleted: {
+    opacity: 0.6,
   },
   stepNumber: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.1)",
     alignItems: "center",
+    justifyContent: "center",
   },
   stepNumberActive: {
     backgroundColor: "#C9A962",
   },
-  stepNumberComplete: {
-    backgroundColor: "#C9A962",
+  stepNumberCompleted: {
+    backgroundColor: "#4ADE80",
   },
   stepNumberText: {
-    fontSize: 13,
+    fontSize: 12,
     color: "#888888",
   },
   stepNumberTextActive: {
     color: "#1A1A1A",
   },
-  stepContent: {
+  stepInfo: {
     flex: 1,
+    gap: 4,
   },
   stepInstruction: {
     fontSize: 14,
-    color: "#AAAAAA",
+    color: "#CCCCCC",
     lineHeight: 20,
   },
   stepInstructionActive: {
@@ -538,7 +740,6 @@ const styles = StyleSheet.create({
   },
   stepDuration: {
     fontSize: 12,
-    color: "#666666",
-    marginTop: 4,
+    color: "#888888",
   },
 });

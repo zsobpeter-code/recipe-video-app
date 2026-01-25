@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,16 +8,20 @@ import {
   Platform,
   KeyboardAvoidingView,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import { Image } from "expo-image";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
+import * as FileSystem from "expo-file-system/legacy";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
   withSpring,
+  withRepeat,
+  Easing,
   FadeIn,
   FadeInDown,
 } from "react-native-reanimated";
@@ -26,6 +30,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { PrimaryButton, GlassmorphismCard } from "@/components/ui";
+import { trpc } from "@/lib/trpc";
 
 export default function RefinementScreen() {
   const router = useRouter();
@@ -48,16 +53,72 @@ export default function RefinementScreen() {
   const [showCorrection, setShowCorrection] = useState(false);
   const [correctedName, setCorrectedName] = useState("");
   const [selectedAlternative, setSelectedAlternative] = useState<string | null>(null);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [regenerationStatus, setRegenerationStatus] = useState("");
+  
+  // Animation for loading spinner
+  const spinValue = useSharedValue(0);
+  
+  useEffect(() => {
+    if (isRegenerating) {
+      spinValue.value = withRepeat(
+        withTiming(360, { duration: 1500, easing: Easing.linear }),
+        -1,
+        false
+      );
+    } else {
+      spinValue.value = 0;
+    }
+  }, [isRegenerating]);
 
-  // Animation values
-  const cardScale = useSharedValue(1);
+  const spinStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${spinValue.value}deg` }],
+  }));
+
+  // tRPC mutation for recipe regeneration
+  const regenerateRecipe = trpc.recipe.analyze.useMutation({
+    onSuccess: (data) => {
+      setIsRegenerating(false);
+      if (data.success && data.recipe) {
+        if (Platform.OS !== "web") {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+        // Navigate to recipe card with NEW recipe data
+        router.replace({
+          pathname: "/recipe-card" as any,
+          params: {
+            imageUri: params.imageUri,
+            dishName: data.recipe.dishName,
+            description: data.recipe.description,
+            cuisine: data.recipe.cuisine || "",
+            difficulty: data.recipe.difficulty,
+            prepTime: String(data.recipe.prepTime),
+            cookTime: String(data.recipe.cookTime),
+            servings: String(data.recipe.servings),
+            ingredients: JSON.stringify(data.recipe.ingredients),
+            steps: JSON.stringify(data.recipe.steps),
+            tags: JSON.stringify(data.recipe.tags || []),
+          },
+        });
+      } else {
+        // Fallback to original recipe with updated name
+        navigateToRecipeCardWithOriginal(correctedName.trim() || selectedAlternative || detectedName);
+      }
+    },
+    onError: (err) => {
+      console.error("Recipe regeneration error:", err);
+      setIsRegenerating(false);
+      // Fallback to original recipe with updated name
+      navigateToRecipeCardWithOriginal(correctedName.trim() || selectedAlternative || detectedName);
+    },
+  });
 
   const handleYes = () => {
     if (Platform.OS !== "web") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-    // Proceed with detected name
-    navigateToRecipeCard(detectedName);
+    // Proceed with detected name and original recipe
+    navigateToRecipeCardWithOriginal(detectedName);
   };
 
   const handleNo = () => {
@@ -75,35 +136,66 @@ export default function RefinementScreen() {
     setCorrectedName("");
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (Platform.OS !== "web") {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
+    
     const finalName = correctedName.trim() || selectedAlternative || detectedName;
-    navigateToRecipeCard(finalName);
+    
+    // If name is different, regenerate recipe with AI
+    if (finalName !== detectedName) {
+      setIsRegenerating(true);
+      setRegenerationStatus("Updating recipe...");
+      
+      try {
+        // Read image and convert to base64
+        let imageBase64 = "";
+        if (params.imageUri && Platform.OS !== "web") {
+          try {
+            setRegenerationStatus("Reading image...");
+            imageBase64 = await FileSystem.readAsStringAsync(params.imageUri, {
+              encoding: FileSystem.EncodingType.Base64,
+            });
+          } catch (err) {
+            console.log("Could not read image for regeneration");
+          }
+        }
+        
+        setRegenerationStatus("Generating new recipe for " + finalName + "...");
+        
+        // Call AI with corrected dish name
+        regenerateRecipe.mutate({
+          imageBase64: imageBase64 || "placeholder",
+          dishName: finalName,
+          userNotes: `The user corrected the dish name from "${detectedName}" to "${finalName}". Please generate a complete recipe for ${finalName}.`,
+        });
+      } catch (err) {
+        console.error("Error during regeneration:", err);
+        setIsRegenerating(false);
+        navigateToRecipeCardWithOriginal(finalName);
+      }
+    } else {
+      navigateToRecipeCardWithOriginal(finalName);
+    }
   };
 
-  const navigateToRecipeCard = (dishName: string) => {
-    // Update recipe data with corrected name
-    const updatedRecipeData = {
-      ...recipeData,
-      dishName,
-    };
-
+  const navigateToRecipeCardWithOriginal = (dishName: string) => {
+    // Use original recipe data with just the name updated
     router.replace({
       pathname: "/recipe-card" as any,
       params: {
         imageUri: params.imageUri,
         dishName,
-        description: updatedRecipeData.description || "",
-        cuisine: updatedRecipeData.cuisine || "",
-        difficulty: updatedRecipeData.difficulty || "Medium",
-        prepTime: String(updatedRecipeData.prepTime || 15),
-        cookTime: String(updatedRecipeData.cookTime || 30),
-        servings: String(updatedRecipeData.servings || 4),
-        ingredients: JSON.stringify(updatedRecipeData.ingredients || []),
-        steps: JSON.stringify(updatedRecipeData.steps || []),
-        tags: JSON.stringify(updatedRecipeData.tags || []),
+        description: recipeData.description || "",
+        cuisine: recipeData.cuisine || "",
+        difficulty: recipeData.difficulty || "medium",
+        prepTime: String(recipeData.prepTime || 15),
+        cookTime: String(recipeData.cookTime || 30),
+        servings: String(recipeData.servings || 4),
+        ingredients: JSON.stringify(recipeData.ingredients || []),
+        steps: JSON.stringify(recipeData.steps || []),
+        tags: JSON.stringify(recipeData.tags || []),
       },
     });
   };
@@ -119,6 +211,33 @@ export default function RefinementScreen() {
     if (confidence >= 0.6) return "Medium confidence";
     return "Low confidence";
   };
+
+  // Show loading overlay when regenerating
+  if (isRegenerating) {
+    return (
+      <ScreenContainer edges={["top", "left", "right", "bottom"]}>
+        <View style={styles.loadingContainer}>
+          <Animated.View style={[styles.loadingSpinner, spinStyle]}>
+            <LinearGradient
+              colors={["#C9A962", "#A88B4A"]}
+              style={styles.spinnerGradient}
+            >
+              <IconSymbol name="sparkles" size={32} color="#1A1A1A" />
+            </LinearGradient>
+          </Animated.View>
+          <Text style={[styles.loadingTitle, { fontFamily: "PlayfairDisplay-Bold" }]}>
+            Updating Recipe
+          </Text>
+          <Text style={[styles.loadingStatus, { fontFamily: "Inter" }]}>
+            {regenerationStatus}
+          </Text>
+          <Text style={[styles.loadingSubtext, { fontFamily: "Caveat" }]}>
+            Generating a new recipe for your corrected dish...
+          </Text>
+        </View>
+      </ScreenContainer>
+    );
+  }
 
   return (
     <ScreenContainer edges={["top", "left", "right", "bottom"]}>
@@ -154,12 +273,19 @@ export default function RefinementScreen() {
             entering={FadeIn.duration(400)}
             style={styles.imageContainer}
           >
-            {params.imageUri && (
+            {params.imageUri ? (
               <Image
                 source={{ uri: params.imageUri }}
                 style={styles.previewImage}
                 contentFit="cover"
               />
+            ) : (
+              <View style={styles.noImagePlaceholder}>
+                <IconSymbol name="doc.text.fill" size={48} color="#555555" />
+                <Text style={[styles.noImageText, { fontFamily: "Inter" }]}>
+                  Text Recipe Detected
+                </Text>
+              </View>
             )}
             <LinearGradient
               colors={["transparent", "rgba(26,26,26,0.8)"]}
@@ -289,9 +415,17 @@ export default function RefinementScreen() {
                     />
                   </View>
 
+                  {/* Info about regeneration */}
+                  <View style={styles.regenerationInfo}>
+                    <IconSymbol name="sparkles" size={14} color="#C9A962" />
+                    <Text style={[styles.regenerationInfoText, { fontFamily: "Inter" }]}>
+                      A new recipe will be generated for the corrected dish
+                    </Text>
+                  </View>
+
                   {/* Confirm Button */}
                   <PrimaryButton
-                    title="Confirm & Continue"
+                    title="Confirm & Generate New Recipe"
                     onPress={handleConfirm}
                     disabled={!correctedName.trim() && !selectedAlternative}
                     style={{ marginTop: 16 }}
@@ -308,7 +442,7 @@ export default function RefinementScreen() {
           >
             <IconSymbol name="lightbulb.fill" size={16} color="#C9A962" />
             <Text style={[styles.tipText, { fontFamily: "Caveat" }]}>
-              Correcting the dish name helps generate more accurate recipes!
+              Correcting the dish name generates a completely new recipe!
             </Text>
           </Animated.View>
         </ScrollView>
@@ -354,6 +488,18 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
+  noImagePlaceholder: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#2A2A2A",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  noImageText: {
+    fontSize: 14,
+    color: "#888888",
+  },
   imageGradient: {
     position: "absolute",
     bottom: 0,
@@ -393,17 +539,17 @@ const styles = StyleSheet.create({
   },
   confidenceBar: {
     width: "80%",
-    height: 6,
-    backgroundColor: "rgba(255,255,255,0.1)",
-    borderRadius: 3,
+    height: 4,
+    backgroundColor: "#333333",
+    borderRadius: 2,
     overflow: "hidden",
   },
   confidenceFill: {
     height: "100%",
-    borderRadius: 3,
+    borderRadius: 2,
   },
   confidenceText: {
-    fontSize: 13,
+    fontSize: 12,
   },
   questionSection: {
     alignItems: "center",
@@ -422,8 +568,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    paddingVertical: 14,
     paddingHorizontal: 24,
+    paddingVertical: 14,
     borderRadius: 12,
   },
   yesButton: {
@@ -443,22 +589,21 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
   correctionSection: {
-    gap: 16,
+    gap: 12,
   },
   correctionLabel: {
     fontSize: 16,
     color: "#FFFFFF",
-    textAlign: "center",
+    marginBottom: 4,
   },
   alternativesContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    justifyContent: "center",
   },
   alternativeChip: {
-    paddingVertical: 10,
     paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 20,
     backgroundColor: "rgba(255,255,255,0.1)",
     borderWidth: 1,
@@ -477,11 +622,11 @@ const styles = StyleSheet.create({
   },
   manualInputContainer: {
     gap: 8,
+    marginTop: 8,
   },
   orText: {
     fontSize: 14,
     color: "#888888",
-    textAlign: "center",
   },
   textInput: {
     backgroundColor: "rgba(255,255,255,0.1)",
@@ -493,16 +638,64 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.2)",
   },
+  regenerationInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "rgba(201,169,98,0.1)",
+    borderRadius: 8,
+  },
+  regenerationInfoText: {
+    fontSize: 12,
+    color: "#C9A962",
+    flex: 1,
+  },
   tipContainer: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     marginHorizontal: 24,
-    marginTop: 24,
-    justifyContent: "center",
+    marginTop: 20,
   },
   tipText: {
     fontSize: 16,
     color: "#888888",
+    flex: 1,
+  },
+  // Loading styles
+  loadingContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  loadingSpinner: {
+    marginBottom: 24,
+  },
+  spinnerGradient: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loadingTitle: {
+    fontSize: 24,
+    color: "#FFFFFF",
+    marginBottom: 8,
+  },
+  loadingStatus: {
+    fontSize: 16,
+    color: "#C9A962",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  loadingSubtext: {
+    fontSize: 18,
+    color: "#888888",
+    textAlign: "center",
   },
 });

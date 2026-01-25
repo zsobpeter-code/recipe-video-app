@@ -112,3 +112,25 @@
 - [x] Ensure Video Generation shows progress animation
 - [x] Add placeholder/demo video to Video Player
 - [x] Make full flow testable end-to-end
+
+## Bug Fixes (Round 2)
+
+### BUG 1: Dish correction doesn't regenerate recipe
+- [x] When user corrects dish name → call AI again with corrected name
+- [x] Generate NEW recipe for the corrected dish
+- [x] Show loading state ("Updating recipe...")
+- [x] Recipe Card shows NEW recipe matching corrected name
+
+### BUG 2: No "Generate AI Photo" option for text recipes
+- [x] On Recipe Card, if no food photo → show "Generate AI Photo" button
+- [x] Button triggers AI image generation (mock for now)
+
+### BUG 3: Video doesn't play
+- [x] Add Ken Burns effect (slow zoom/pan) on recipe photo as placeholder
+- [x] Play/pause button works
+- [x] Timer counts properly with auto-advance
+
+### BUG 4: Console Error - Text strings in wrong component
+- [x] Reviewed all screens and components for text rendering issues
+- [x] All text content is properly wrapped in <Text> components
+- [x] TypeScript check passes with no errors
