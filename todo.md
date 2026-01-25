@@ -33,15 +33,36 @@
 - [x] Create analyze-image tRPC route with Claude Vision
 - [x] Build Recipe Card Screen with glassmorphism design
 - [x] Connect Processing Screen to tRPC AI route
-- [ ] Home Screen with recipe grid (future)
-- [ ] Refinement Screen (clarification questions) (future)
+## Phase 3: Collection
 
-## Phase 3: Collection (Future)
+### Save to Collection Flow
+- [x] Create Supabase Storage bucket for recipe images
+- [x] Create tRPC routes for recipe CRUD operations
+- [x] Connect Save to Collection button to Supabase
+- [x] Upload captured image to Supabase Storage
+- [x] Save recipe data to recipes table
+- [x] Show success confirmation
 
-- [ ] Search functionality
-- [ ] Category filtering
-- [ ] Favorites toggle
-- [ ] Recipe CRUD operations
+### Home Screen
+- [x] Build Home Screen with 2-column recipe grid
+- [x] Display recipe photo, title, cook time on cards
+- [x] Add category filter pills (All, Main, Soup, Dessert, Favorites)
+- [x] Add search bar
+- [x] Tap card to open Recipe Card Screen
+- [x] Add empty state when no recipes
+
+### Collection Tab
+- [x] Build Collection tab with same grid layout
+- [x] Add pull-to-refresh
+- [x] Add favorite toggle on cards (heart icon)
+
+### Delete Recipe
+- [x] Add swipe to delete or long-press menu
+- [x] Add confirmation dialog
+
+## Future Phases
+
+- [ ] Refinement Screen (clarification questions)
 
 ## Phase 4: AI Generation (Future)
 

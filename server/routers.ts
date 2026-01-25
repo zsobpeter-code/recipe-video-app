@@ -4,6 +4,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { invokeLLM } from "./_core/llm";
+import { storagePut } from "./storage";
 
 // Recipe analysis response schema
 const recipeSchema = z.object({
@@ -11,8 +12,8 @@ const recipeSchema = z.object({
   description: z.string(),
   cuisine: z.string().optional(),
   difficulty: z.enum(["easy", "medium", "hard"]),
-  prepTime: z.number(), // in minutes
-  cookTime: z.number(), // in minutes
+  prepTime: z.number(),
+  cookTime: z.number(),
   servings: z.number(),
   ingredients: z.array(z.object({
     name: z.string(),
@@ -23,7 +24,7 @@ const recipeSchema = z.object({
   steps: z.array(z.object({
     stepNumber: z.number(),
     instruction: z.string(),
-    duration: z.number().optional(), // in minutes
+    duration: z.number().optional(),
     tips: z.string().optional(),
   })),
   nutritionEstimate: z.object({
@@ -37,6 +38,31 @@ const recipeSchema = z.object({
 
 export type RecipeData = z.infer<typeof recipeSchema>;
 
+// Saved recipe type (from database)
+export interface SavedRecipe {
+  id: string;
+  userId: string;
+  dishName: string;
+  description: string;
+  cuisine: string | null;
+  category: string;
+  difficulty: string;
+  prepTime: number;
+  cookTime: number;
+  servings: number;
+  ingredients: string; // JSON string
+  steps: string; // JSON string
+  tags: string | null; // JSON string
+  imageUrl: string | null;
+  isFavorite: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// In-memory storage for recipes (since we're using Supabase directly from client)
+// This is a simplified approach - in production, you'd use proper database queries
+const recipes: Map<string, SavedRecipe> = new Map();
+
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -44,14 +70,13 @@ export const appRouter = router({
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
-      return {
-        success: true,
-      } as const;
+      return { success: true } as const;
     }),
   }),
 
-  // Recipe analysis with Claude Vision
+  // Recipe operations
   recipe: router({
+    // Analyze image with Claude Vision
     analyze: publicProcedure
       .input(z.object({
         imageBase64: z.string().describe("Base64 encoded image data"),
@@ -61,7 +86,6 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const { imageBase64, dishName, userNotes } = input;
 
-        // Build the prompt
         const systemPrompt = `You are an expert culinary AI assistant that analyzes food images and extracts detailed recipe information. 
 You have extensive knowledge of cuisines from around the world, cooking techniques, and ingredient identification.
 
@@ -130,12 +154,10 @@ Always return your response as valid JSON matching this exact structure:
             throw new Error("No response from AI");
           }
 
-          // Ensure content is a string for JSON parsing
           const content = typeof rawContent === 'string' 
             ? rawContent 
             : JSON.stringify(rawContent);
 
-          // Parse and validate the response
           const recipeData = JSON.parse(content);
           const validatedRecipe = recipeSchema.parse(recipeData);
 
@@ -145,12 +167,207 @@ Always return your response as valid JSON matching this exact structure:
           };
         } catch (error) {
           console.error("Recipe analysis error:", error);
-          
-          // Return a fallback recipe structure if AI fails
           return {
             success: false,
             error: error instanceof Error ? error.message : "Failed to analyze image",
             recipe: null,
+          };
+        }
+      }),
+
+    // Upload image to storage
+    uploadImage: publicProcedure
+      .input(z.object({
+        imageBase64: z.string(),
+        fileName: z.string(),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          const { imageBase64, fileName } = input;
+          const buffer = Buffer.from(imageBase64, "base64");
+          const timestamp = Date.now();
+          const randomSuffix = Math.random().toString(36).substring(2, 8);
+          const key = `recipes/${timestamp}-${randomSuffix}-${fileName}`;
+          
+          const { url } = await storagePut(key, buffer, "image/jpeg");
+          
+          return { success: true, url };
+        } catch (error) {
+          console.error("Image upload error:", error);
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to upload image",
+            url: null,
+          };
+        }
+      }),
+
+    // Save recipe to collection
+    save: publicProcedure
+      .input(z.object({
+        dishName: z.string(),
+        description: z.string(),
+        cuisine: z.string().optional(),
+        category: z.string().default("Main"),
+        difficulty: z.string(),
+        prepTime: z.number(),
+        cookTime: z.number(),
+        servings: z.number(),
+        ingredients: z.string(), // JSON string
+        steps: z.string(), // JSON string
+        tags: z.string().optional(), // JSON string
+        imageUrl: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          const id = `recipe-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+          const now = new Date().toISOString();
+          
+          const recipe: SavedRecipe = {
+            id,
+            userId: "anonymous", // For now, we're not requiring auth
+            dishName: input.dishName,
+            description: input.description,
+            cuisine: input.cuisine || null,
+            category: input.category,
+            difficulty: input.difficulty,
+            prepTime: input.prepTime,
+            cookTime: input.cookTime,
+            servings: input.servings,
+            ingredients: input.ingredients,
+            steps: input.steps,
+            tags: input.tags || null,
+            imageUrl: input.imageUrl || null,
+            isFavorite: false,
+            createdAt: now,
+            updatedAt: now,
+          };
+          
+          recipes.set(id, recipe);
+          
+          return { success: true, recipe };
+        } catch (error) {
+          console.error("Save recipe error:", error);
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to save recipe",
+            recipe: null,
+          };
+        }
+      }),
+
+    // List all recipes
+    list: publicProcedure
+      .input(z.object({
+        category: z.string().optional(),
+        search: z.string().optional(),
+        favoritesOnly: z.boolean().optional(),
+      }).optional())
+      .query(async ({ input }) => {
+        try {
+          let recipeList = Array.from(recipes.values());
+          
+          // Filter by category
+          if (input?.category && input.category !== "All") {
+            if (input.category === "Favorites") {
+              recipeList = recipeList.filter(r => r.isFavorite);
+            } else {
+              recipeList = recipeList.filter(r => r.category === input.category);
+            }
+          }
+          
+          // Filter by favorites
+          if (input?.favoritesOnly) {
+            recipeList = recipeList.filter(r => r.isFavorite);
+          }
+          
+          // Search by name
+          if (input?.search) {
+            const searchLower = input.search.toLowerCase();
+            recipeList = recipeList.filter(r => 
+              r.dishName.toLowerCase().includes(searchLower) ||
+              r.description.toLowerCase().includes(searchLower)
+            );
+          }
+          
+          // Sort by creation date (newest first)
+          recipeList.sort((a, b) => 
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+          
+          return { success: true, recipes: recipeList };
+        } catch (error) {
+          console.error("List recipes error:", error);
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to list recipes",
+            recipes: [],
+          };
+        }
+      }),
+
+    // Get single recipe by ID
+    get: publicProcedure
+      .input(z.object({ id: z.string() }))
+      .query(async ({ input }) => {
+        try {
+          const recipe = recipes.get(input.id);
+          if (!recipe) {
+            return { success: false, error: "Recipe not found", recipe: null };
+          }
+          return { success: true, recipe };
+        } catch (error) {
+          console.error("Get recipe error:", error);
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to get recipe",
+            recipe: null,
+          };
+        }
+      }),
+
+    // Toggle favorite status
+    toggleFavorite: publicProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ input }) => {
+        try {
+          const recipe = recipes.get(input.id);
+          if (!recipe) {
+            return { success: false, error: "Recipe not found" };
+          }
+          
+          recipe.isFavorite = !recipe.isFavorite;
+          recipe.updatedAt = new Date().toISOString();
+          recipes.set(input.id, recipe);
+          
+          return { success: true, isFavorite: recipe.isFavorite };
+        } catch (error) {
+          console.error("Toggle favorite error:", error);
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to toggle favorite",
+          };
+        }
+      }),
+
+    // Delete recipe
+    delete: publicProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ input }) => {
+        try {
+          const recipe = recipes.get(input.id);
+          if (!recipe) {
+            return { success: false, error: "Recipe not found" };
+          }
+          
+          recipes.delete(input.id);
+          
+          return { success: true };
+        } catch (error) {
+          console.error("Delete recipe error:", error);
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to delete recipe",
           };
         }
       }),

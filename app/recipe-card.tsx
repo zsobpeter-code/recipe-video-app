@@ -7,11 +7,14 @@ import {
   StyleSheet,
   Platform,
   Dimensions,
+  Alert,
+  ActivityIndicator,
 } from "react-native";
 import { Image } from "expo-image";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
+import * as FileSystem from "expo-file-system/legacy";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -22,6 +25,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { PrimaryButton, SecondaryButton, GlassmorphismCard } from "@/components/ui";
+import { trpc } from "@/lib/trpc";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -54,6 +58,7 @@ export default function RecipeCardScreen() {
     ingredients: string;
     steps: string;
     tags: string;
+    recipeId?: string; // If viewing an existing recipe
   }>();
 
   // Parse JSON params
@@ -62,10 +67,16 @@ export default function RecipeCardScreen() {
   const tags: string[] = params.tags ? JSON.parse(params.tags) : [];
 
   const [expandedSection, setExpandedSection] = useState<"ingredients" | "steps" | null>("ingredients");
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSaved, setIsSaved] = useState(!!params.recipeId);
   
   // Animation values
   const ingredientsHeight = useSharedValue(1);
   const stepsHeight = useSharedValue(0);
+
+  // tRPC mutations
+  const uploadImage = trpc.recipe.uploadImage.useMutation();
+  const saveRecipe = trpc.recipe.save.useMutation();
 
   const toggleSection = (section: "ingredients" | "steps") => {
     if (Platform.OS !== "web") {
@@ -111,16 +122,120 @@ export default function RecipeCardScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
     // TODO: Navigate to video generation / paywall
-    console.log("Generate video pressed");
+    Alert.alert(
+      "Coming Soon",
+      "Video generation will be available in a future update!",
+      [{ text: "OK" }]
+    );
   };
 
-  const handleSaveToCollection = () => {
-    if (Platform.OS !== "web") {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  const handleSaveToCollection = async () => {
+    if (isSaved) {
+      // Already saved, just navigate
+      router.replace("/(tabs)/collection");
+      return;
     }
-    // TODO: Save to collection
-    console.log("Save to collection pressed");
-    router.replace("/(tabs)/collection");
+
+    setIsSaving(true);
+    
+    try {
+      let imageUrl: string | undefined;
+      
+      // Upload image if we have one
+      if (params.imageUri) {
+        let imageBase64 = "";
+        
+        if (Platform.OS === "web") {
+          // On web, fetch the image and convert to base64
+          const response = await fetch(params.imageUri);
+          const blob = await response.blob();
+          imageBase64 = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const result = reader.result as string;
+              resolve(result.split(",")[1] || "");
+            };
+            reader.readAsDataURL(blob);
+          });
+        } else {
+          // On native, use FileSystem
+          imageBase64 = await FileSystem.readAsStringAsync(params.imageUri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+        }
+        
+        const uploadResult = await uploadImage.mutateAsync({
+          imageBase64,
+          fileName: `${params.dishName?.replace(/\s+/g, "-") || "recipe"}.jpg`,
+        });
+        
+        if (uploadResult.success && uploadResult.url) {
+          imageUrl = uploadResult.url;
+        }
+      }
+      
+      // Determine category based on cuisine/tags
+      let category = "Main";
+      const lowerTags = tags.map(t => t.toLowerCase());
+      const lowerCuisine = (params.cuisine || "").toLowerCase();
+      
+      if (lowerTags.includes("dessert") || lowerTags.includes("sweet")) {
+        category = "Dessert";
+      } else if (lowerTags.includes("soup") || lowerCuisine.includes("soup")) {
+        category = "Soup";
+      } else if (lowerTags.includes("appetizer") || lowerTags.includes("starter")) {
+        category = "Appetizer";
+      }
+      
+      // Save recipe
+      const saveResult = await saveRecipe.mutateAsync({
+        dishName: params.dishName || "Untitled Recipe",
+        description: params.description || "",
+        cuisine: params.cuisine || undefined,
+        category,
+        difficulty: params.difficulty || "medium",
+        prepTime: parseInt(params.prepTime || "0"),
+        cookTime: parseInt(params.cookTime || "0"),
+        servings: parseInt(params.servings || "4"),
+        ingredients: params.ingredients || "[]",
+        steps: params.steps || "[]",
+        tags: params.tags || undefined,
+        imageUrl,
+      });
+      
+      if (saveResult.success) {
+        setIsSaved(true);
+        
+        if (Platform.OS !== "web") {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+        
+        Alert.alert(
+          "Recipe Saved! 🎉",
+          `"${params.dishName}" has been added to your collection.`,
+          [
+            { text: "View Collection", onPress: () => router.replace("/(tabs)/collection") },
+            { text: "Stay Here", style: "cancel" },
+          ]
+        );
+      } else {
+        throw new Error(saveResult.error || "Failed to save recipe");
+      }
+    } catch (error) {
+      console.error("Save error:", error);
+      
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
+      
+      Alert.alert(
+        "Save Failed",
+        error instanceof Error ? error.message : "Unable to save recipe. Please try again.",
+        [{ text: "OK" }]
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const totalTime = (parseInt(params.prepTime || "0") + parseInt(params.cookTime || "0"));
@@ -332,10 +447,15 @@ export default function RecipeCardScreen() {
       {/* Bottom action buttons */}
       <View style={[styles.bottomActions, { paddingBottom: insets.bottom + 16 }]}>
         <SecondaryButton
-          title="Save"
+          title={isSaved ? "Saved ✓" : "Save"}
           onPress={handleSaveToCollection}
-          icon={<IconSymbol name="bookmark.fill" size={18} color="#C9A962" />}
-          style={{ flex: 1 }}
+          icon={isSaving ? (
+            <ActivityIndicator size="small" color="#C9A962" />
+          ) : (
+            <IconSymbol name="bookmark.fill" size={18} color="#C9A962" />
+          )}
+          style={{ flex: 1, opacity: isSaving ? 0.7 : 1 }}
+          disabled={isSaving}
         />
         <PrimaryButton
           title="Generate Video · $1.99"

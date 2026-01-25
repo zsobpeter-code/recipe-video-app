@@ -48,6 +48,9 @@ const MAPPING = {
   "bookmark.fill": "bookmark",
   "video.fill": "videocam",
   "star.fill": "star",
+  "magnifyingglass": "search",
+  "trash.fill": "delete",
+  "ellipsis": "more-horiz",
 } as IconMapping;
 
 /**
