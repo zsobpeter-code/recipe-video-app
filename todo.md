@@ -64,15 +64,24 @@
 
 - [ ] Refinement Screen (clarification questions)
 
-## Phase 4: AI Generation (Future)
+## Phase 4: Video Generation & Monetization
 
-- [ ] Image generation flow
-- [ ] Video generation flow
-- [ ] Video Player Screen
-- [ ] Timer Screen
+### Profile Tab
+- [x] Build Profile Tab with user avatar and email
+- [x] Add stats section (recipes count, videos generated)
+- [x] Add subscription status section
+- [x] Add settings links (Notifications, Appearance, Help, Terms, Privacy)
+- [x] Add Sign Out button with confirmation
 
-## Phase 5: Monetization (Future)
+### Paywall Screen
+- [x] Build Paywall Screen with premium illustration
+- [x] Add feature list (videos, AI photos, storage, sync)
+- [x] Add pricing options ($1.99, $6.99/5, $19.99/mo)
+- [x] Add Continue button and Restore Purchases link
 
-- [ ] RevenueCat integration
-- [ ] Paywall Screen
-- [ ] Purchase flows
+### Video Generation Flow
+- [x] Connect Generate Video button to Paywall
+- [x] Build Video Generation Screen with progress animation
+- [x] Build Video Player Screen with step-by-step playback
+- [x] Add navigation between video steps (prev/next)
+- [x] Mock payment and generation for now

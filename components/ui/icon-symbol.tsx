@@ -51,6 +51,24 @@ const MAPPING = {
   "magnifyingglass": "search",
   "trash.fill": "delete",
   "ellipsis": "more-horiz",
+  
+  // Profile & Settings
+  "gearshape.fill": "settings",
+  "bell.fill": "notifications",
+  "paintbrush.fill": "palette",
+  "questionmark.circle.fill": "help",
+  "doc.text.fill": "description",
+  "lock.fill": "lock",
+  "rectangle.portrait.and.arrow.right": "logout",
+  "crown.fill": "workspace-premium",
+  "checkmark.circle.fill": "check-circle",
+  "arrow.clockwise": "refresh",
+  
+  // Video player
+  "backward.fill": "skip-previous",
+  "forward.fill": "skip-next",
+  "arrow.left": "arrow-back",
+  "arrow.right": "arrow-forward",
 } as IconMapping;
 
 /**

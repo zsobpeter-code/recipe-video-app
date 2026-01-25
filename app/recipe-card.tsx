@@ -119,14 +119,25 @@ export default function RecipeCardScreen() {
 
   const handleGenerateVideo = () => {
     if (Platform.OS !== "web") {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
-    // TODO: Navigate to video generation / paywall
-    Alert.alert(
-      "Coming Soon",
-      "Video generation will be available in a future update!",
-      [{ text: "OK" }]
-    );
+    
+    // Navigate to paywall with recipe data
+    router.push({
+      pathname: "/paywall" as any,
+      params: {
+        dishName: params.dishName,
+        recipeData: JSON.stringify({
+          dishName: params.dishName,
+          description: params.description,
+          ingredients: params.ingredients,
+          steps: params.steps,
+          prepTime: params.prepTime,
+          cookTime: params.cookTime,
+        }),
+        imageUri: params.imageUri,
+      },
+    });
   };
 
   const handleSaveToCollection = async () => {
