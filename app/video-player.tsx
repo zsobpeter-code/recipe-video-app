@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   ScrollView,
   Dimensions,
+  Share,
+  Alert,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Image } from "expo-image";
@@ -19,8 +21,10 @@ import Animated, {
   withSequence,
   Easing,
   cancelAnimation,
+  interpolate,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -33,6 +37,15 @@ interface RecipeStep {
   duration: string;
   durationSeconds: number;
 }
+
+// Step-specific visual styles for variety
+const STEP_VISUALS = [
+  { scale: [1, 1.15], translateX: [0, 15], translateY: [0, 10], overlay: "rgba(201,169,98,0.1)" },
+  { scale: [1.05, 1.2], translateX: [-10, 10], translateY: [5, -5], overlay: "rgba(139,90,43,0.15)" },
+  { scale: [1, 1.1], translateX: [10, -10], translateY: [-5, 5], overlay: "rgba(201,169,98,0.08)" },
+  { scale: [1.08, 1.18], translateX: [5, -15], translateY: [10, 0], overlay: "rgba(168,139,74,0.12)" },
+  { scale: [1.02, 1.12], translateX: [-5, 5], translateY: [0, 8], overlay: "rgba(201,169,98,0.05)" },
+];
 
 export default function VideoPlayerScreen() {
   const router = useRouter();
@@ -49,11 +62,13 @@ export default function VideoPlayerScreen() {
   const [elapsedTime, setElapsedTime] = useState(0);
   
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stepsScrollRef = useRef<ScrollView>(null);
 
   // Ken Burns animation values
   const scale = useSharedValue(1);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
+  const overlayOpacity = useSharedValue(0);
 
   // Parse recipe data
   useEffect(() => {
@@ -81,7 +96,7 @@ export default function VideoPlayerScreen() {
             }
             return {
               number: step.stepNumber || index + 1,
-              instruction: step.instruction,
+              instruction: typeof step.instruction === 'string' ? step.instruction : String(step.instruction || ''),
               duration: `${mins}:${String(secs).padStart(2, "0")}`,
               durationSeconds: durationSecs,
             };
@@ -114,37 +129,50 @@ export default function VideoPlayerScreen() {
     }
   }, [params.recipeData]);
 
-  // Ken Burns effect - slow zoom and pan animation
+  // Get visual style for current step (cycles through available styles)
+  const currentVisual = STEP_VISUALS[currentStepIndex % STEP_VISUALS.length];
+
+  // Ken Burns effect - different animation per step
   useEffect(() => {
     if (isPlaying) {
-      // Start Ken Burns animation
-      const duration = 8000; // 8 seconds per cycle
+      const duration = 6000; // 6 seconds per cycle
+      const visual = STEP_VISUALS[currentStepIndex % STEP_VISUALS.length];
       
-      // Zoom in slowly while panning
+      // Zoom animation specific to this step
       scale.value = withRepeat(
         withSequence(
-          withTiming(1.15, { duration, easing: Easing.inOut(Easing.ease) }),
-          withTiming(1, { duration, easing: Easing.inOut(Easing.ease) })
+          withTiming(visual.scale[1], { duration, easing: Easing.inOut(Easing.ease) }),
+          withTiming(visual.scale[0], { duration, easing: Easing.inOut(Easing.ease) })
         ),
         -1,
         true
       );
       
-      // Pan horizontally
+      // Pan horizontally - different per step
       translateX.value = withRepeat(
         withSequence(
-          withTiming(15, { duration, easing: Easing.inOut(Easing.ease) }),
-          withTiming(-15, { duration, easing: Easing.inOut(Easing.ease) })
+          withTiming(visual.translateX[1], { duration, easing: Easing.inOut(Easing.ease) }),
+          withTiming(visual.translateX[0], { duration, easing: Easing.inOut(Easing.ease) })
         ),
         -1,
         true
       );
       
-      // Pan vertically
+      // Pan vertically - different per step
       translateY.value = withRepeat(
         withSequence(
-          withTiming(10, { duration, easing: Easing.inOut(Easing.ease) }),
-          withTiming(-10, { duration, easing: Easing.inOut(Easing.ease) })
+          withTiming(visual.translateY[1], { duration, easing: Easing.inOut(Easing.ease) }),
+          withTiming(visual.translateY[0], { duration, easing: Easing.inOut(Easing.ease) })
+        ),
+        -1,
+        true
+      );
+
+      // Pulse overlay opacity
+      overlayOpacity.value = withRepeat(
+        withSequence(
+          withTiming(0.3, { duration: duration / 2, easing: Easing.inOut(Easing.ease) }),
+          withTiming(0, { duration: duration / 2, easing: Easing.inOut(Easing.ease) })
         ),
         -1,
         true
@@ -154,11 +182,13 @@ export default function VideoPlayerScreen() {
       cancelAnimation(scale);
       cancelAnimation(translateX);
       cancelAnimation(translateY);
+      cancelAnimation(overlayOpacity);
       scale.value = withTiming(1, { duration: 300 });
       translateX.value = withTiming(0, { duration: 300 });
       translateY.value = withTiming(0, { duration: 300 });
+      overlayOpacity.value = withTiming(0, { duration: 300 });
     }
-  }, [isPlaying]);
+  }, [isPlaying, currentStepIndex]);
 
   // Timer effect
   useEffect(() => {
@@ -205,6 +235,10 @@ export default function VideoPlayerScreen() {
       { translateX: translateX.value },
       { translateY: translateY.value },
     ],
+  }));
+
+  const overlayStyle = useAnimatedStyle(() => ({
+    opacity: overlayOpacity.value,
   }));
 
   const currentStep = steps[currentStepIndex];
@@ -261,11 +295,36 @@ export default function VideoPlayerScreen() {
     router.back();
   };
 
-  const handleShare = () => {
+  const handleShare = async () => {
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    // Share functionality would go here
+    
+    try {
+      const dishName = params.dishName || "Delicious Recipe";
+      const totalSteps = steps.length;
+      const totalTime = steps.reduce((acc, step) => acc + step.durationSeconds, 0);
+      const totalMins = Math.floor(totalTime / 60);
+      
+      const message = `🍳 Check out this recipe for ${dishName}!\n\n` +
+        `📝 ${totalSteps} easy steps\n` +
+        `⏱️ Total time: ${totalMins} minutes\n\n` +
+        `Made with Recipe Studio`;
+      
+      const result = await Share.share({
+        message,
+        title: `${dishName} Recipe`,
+      });
+      
+      if (result.action === Share.sharedAction) {
+        if (Platform.OS !== "web") {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+      }
+    } catch (error) {
+      console.error("Share error:", error);
+      Alert.alert("Share Failed", "Unable to share recipe. Please try again.");
+    }
   };
 
   return (
@@ -297,17 +356,31 @@ export default function VideoPlayerScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Video Preview Area with Ken Burns Effect */}
-      <View style={styles.videoContainer}>
+      {/* Video Preview Area with Ken Burns Effect - NO play button overlay */}
+      <TouchableOpacity 
+        style={styles.videoContainer}
+        onPress={handlePlayPause}
+        activeOpacity={1}
+      >
         <View style={styles.videoWrapper}>
           {params.imageUri ? (
-            <Animated.View style={[styles.kenBurnsContainer, kenBurnsStyle]}>
-              <Image
-                source={{ uri: params.imageUri }}
-                style={styles.videoPreview}
-                contentFit="cover"
+            <>
+              <Animated.View style={[styles.kenBurnsContainer, kenBurnsStyle]}>
+                <Image
+                  source={{ uri: params.imageUri }}
+                  style={styles.videoPreview}
+                  contentFit="cover"
+                />
+              </Animated.View>
+              {/* Step-specific color overlay for visual variety */}
+              <Animated.View 
+                style={[
+                  styles.stepOverlay, 
+                  overlayStyle,
+                  { backgroundColor: currentVisual.overlay }
+                ]} 
               />
-            </Animated.View>
+            </>
           ) : (
             <View style={styles.videoPlaceholder}>
               <IconSymbol name="video.fill" size={48} color="#555555" />
@@ -318,7 +391,7 @@ export default function VideoPlayerScreen() {
           )}
         </View>
         
-        {/* Video Overlay */}
+        {/* Video Overlay - Step indicator and timer only */}
         <View style={styles.videoOverlay}>
           {/* Step indicator */}
           <View style={styles.stepBadge}>
@@ -341,21 +414,6 @@ export default function VideoPlayerScreen() {
           <View style={[styles.progressBar, { width: `${progressPercent}%` }]} />
         </View>
 
-        {/* Play button overlay */}
-        <TouchableOpacity 
-          style={styles.playButtonOverlay}
-          onPress={handlePlayPause}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.playButton, isPlaying && styles.playButtonPlaying]}>
-            <IconSymbol 
-              name={isPlaying ? "pause.fill" : "play.fill"} 
-              size={32} 
-              color="#1A1A1A" 
-            />
-          </View>
-        </TouchableOpacity>
-
         {/* Playing indicator */}
         {isPlaying && (
           <View style={styles.playingIndicator}>
@@ -365,7 +423,16 @@ export default function VideoPlayerScreen() {
             </Text>
           </View>
         )}
-      </View>
+
+        {/* Paused indicator - subtle tap hint */}
+        {!isPlaying && (
+          <View style={styles.pausedIndicator}>
+            <Text style={[styles.pausedText, { fontFamily: "Inter" }]}>
+              Tap to play
+            </Text>
+          </View>
+        )}
+      </TouchableOpacity>
 
       {/* Current Step Display */}
       <View style={styles.currentStepContainer}>
@@ -377,7 +444,7 @@ export default function VideoPlayerScreen() {
         </Text>
       </View>
 
-      {/* Navigation Controls */}
+      {/* Navigation Controls - Single play/pause button here */}
       <View style={styles.navigationControls}>
         <TouchableOpacity
           style={[
@@ -430,15 +497,17 @@ export default function VideoPlayerScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Steps List */}
+      {/* Steps List - Now in a scrollable container */}
       <View style={styles.stepsListContainer}>
         <Text style={[styles.stepsListTitle, { fontFamily: "Inter-Medium" }]}>
           ALL STEPS
         </Text>
         <ScrollView 
+          ref={stepsScrollRef}
           style={styles.stepsList}
           contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
-          showsVerticalScrollIndicator={false}
+          showsVerticalScrollIndicator={true}
+          nestedScrollEnabled={true}
         >
           {steps.map((step, index) => (
             <TouchableOpacity
@@ -533,6 +602,13 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
+  stepOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
   videoPlaceholder: {
     flex: 1,
     alignItems: "center",
@@ -586,26 +662,6 @@ const styles = StyleSheet.create({
     height: "100%",
     backgroundColor: "#C9A962",
   },
-  playButtonOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  playButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "rgba(255,255,255,0.9)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  playButtonPlaying: {
-    backgroundColor: "rgba(255,255,255,0.3)",
-  },
   playingIndicator: {
     position: "absolute",
     bottom: 16,
@@ -624,6 +680,17 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: "#FFFFFF",
     letterSpacing: 1,
+  },
+  pausedIndicator: {
+    position: "absolute",
+    bottom: 16,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+  },
+  pausedText: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.6)",
   },
   currentStepContainer: {
     paddingHorizontal: 20,
@@ -677,6 +744,7 @@ const styles = StyleSheet.create({
   stepsListContainer: {
     flex: 1,
     paddingHorizontal: 16,
+    minHeight: 150,
   },
   stepsListTitle: {
     fontSize: 11,

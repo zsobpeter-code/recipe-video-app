@@ -92,7 +92,14 @@ export default function RecipeCardScreen() {
   const [generatedPhotoUri, setGeneratedPhotoUri] = useState<string | null>(null);
   
   // Check if we have a food photo or just text recipe
-  const hasPhoto = !!params.imageUri && !params.imageUri.includes("placeholder");
+  // We show the "Generate AI Photo" button when:
+  // 1. No image at all
+  // 2. Image is a placeholder
+  // 3. User hasn't already generated an AI photo
+  // The button allows users to generate a beautiful AI food photo for any recipe
+  const hasValidFoodPhoto = !!params.imageUri && 
+                            !params.imageUri.includes("placeholder") && 
+                            params.imageUri.length > 0;
   
   // Animation values
   const ingredientsHeight = useSharedValue(1);
@@ -356,8 +363,8 @@ export default function RecipeCardScreen() {
           style={styles.vignette}
         />
         
-        {/* Generate AI Photo button - shown when no food photo */}
-        {!hasPhoto && !generatedPhotoUri && (
+        {/* Generate AI Photo button - shown when user wants to generate/regenerate */}
+        {!generatedPhotoUri && (
           <TouchableOpacity
             style={styles.generatePhotoButton}
             onPress={handleGenerateAIPhoto}

@@ -154,3 +154,26 @@
 - [x] Pass generated AI image to video player
 - [x] Use AI-generated food image for Ken Burns effect
 - [ ] Never show handwritten text photo in video player
+
+## Bug Fixes (Round 4) - Video Player
+
+### BUG 1: Video doesn't show different images per step
+- [x] Added step-specific visual styles (different zoom/pan patterns)
+- [x] Added color overlay that changes per step for visual variety
+
+### BUG 2: Two play buttons on screen
+- [x] Removed play button overlay from the image
+- [x] Keep only the gold play/pause button at bottom
+- [x] Added "Tap to play" hint when paused
+
+### BUG 3: Page not scrollable
+- [x] Made the ALL STEPS section scrollable
+- [x] Users can see full step list with nested scroll
+
+### BUG 4: Share button doesn't work
+- [x] Implemented share functionality using React Native Share API
+- [x] Shares recipe name, step count, and total time
+
+### BUG 5: No Generate AI Photo option after recipe loads
+- [x] Show Generate AI Photo button for all recipes (not just text)
+- [x] Button appears on Recipe Card allowing users to generate AI food images anytime
