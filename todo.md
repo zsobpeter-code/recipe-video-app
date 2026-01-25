@@ -91,3 +91,7 @@
 - [x] Add demo recipes for testing the full flow
 - [x] Verify app builds correctly for iOS
 - [x] Provide Expo Go testing instructions
+
+## Bug Fixes
+
+- [x] Fix recipe steps rendering - display step.instruction instead of whole step object

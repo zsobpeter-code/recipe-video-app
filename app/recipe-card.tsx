@@ -63,8 +63,21 @@ export default function RecipeCardScreen() {
 
   // Parse JSON params
   const ingredients: Ingredient[] = params.ingredients ? JSON.parse(params.ingredients) : [];
-  const steps: Step[] = params.steps ? JSON.parse(params.steps) : [];
   const tags: string[] = params.tags ? JSON.parse(params.tags) : [];
+  
+  // Parse steps - handle both string array (demo recipes) and Step object array (AI-generated)
+  const rawSteps = params.steps ? JSON.parse(params.steps) : [];
+  const steps: Step[] = rawSteps.map((step: string | Step, index: number) => {
+    if (typeof step === "string") {
+      // Demo recipes have simple string steps
+      return {
+        stepNumber: index + 1,
+        instruction: step,
+      };
+    }
+    // AI-generated recipes have Step objects
+    return step;
+  });
 
   const [expandedSection, setExpandedSection] = useState<"ingredients" | "steps" | null>("ingredients");
   const [isSaving, setIsSaving] = useState(false);
