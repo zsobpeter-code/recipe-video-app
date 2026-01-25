@@ -136,12 +136,12 @@ describe("AI Integration Tests", () => {
       expect(content).toContain("FileSystem.readAsStringAsync");
     });
 
-    it("should navigate to recipe-card on success", () => {
+    it("should navigate to refinement screen on success", () => {
       const screenPath = path.join(process.cwd(), "app/processing.tsx");
       const content = fs.readFileSync(screenPath, "utf-8");
       
       expect(content).toContain("router.replace");
-      expect(content).toContain("/recipe-card");
+      expect(content).toContain("/refinement");
     });
 
     it("should handle errors with user feedback", () => {
@@ -182,3 +182,54 @@ describe("AI Integration Tests", () => {
     });
   });
 });
+
+  describe("Refinement Screen", () => {
+    it("should have refinement screen file", () => {
+      const screenPath = path.join(process.cwd(), "app/refinement.tsx");
+      expect(fs.existsSync(screenPath)).toBe(true);
+    });
+
+    it("should show confidence score", () => {
+      const screenPath = path.join(process.cwd(), "app/refinement.tsx");
+      const content = fs.readFileSync(screenPath, "utf-8");
+      
+      expect(content).toContain("confidence");
+    });
+
+    it("should have Yes/No buttons for dish confirmation", () => {
+      const screenPath = path.join(process.cwd(), "app/refinement.tsx");
+      const content = fs.readFileSync(screenPath, "utf-8");
+      
+      expect(content).toContain("Yes");
+      expect(content).toContain("No");
+    });
+
+    it("should allow manual dish name correction", () => {
+      const screenPath = path.join(process.cwd(), "app/refinement.tsx");
+      const content = fs.readFileSync(screenPath, "utf-8");
+      
+      expect(content).toContain("TextInput");
+      expect(content).toContain("correctedName");
+    });
+
+    it("should show alternative suggestions", () => {
+      const screenPath = path.join(process.cwd(), "app/refinement.tsx");
+      const content = fs.readFileSync(screenPath, "utf-8");
+      
+      expect(content).toContain("alternatives");
+    });
+
+    it("should navigate to recipe-card on confirm", () => {
+      const screenPath = path.join(process.cwd(), "app/refinement.tsx");
+      const content = fs.readFileSync(screenPath, "utf-8");
+      
+      expect(content).toContain("/recipe-card");
+    });
+
+    it("should be registered in Stack navigator", () => {
+      const layoutPath = path.join(process.cwd(), "app/_layout.tsx");
+      const content = fs.readFileSync(layoutPath, "utf-8");
+      
+      expect(content).toContain('name="refinement"');
+    });
+  });

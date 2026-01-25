@@ -34,6 +34,8 @@ const recipeSchema = z.object({
     fat: z.string().optional(),
   }).optional(),
   tags: z.array(z.string()).optional(),
+  confidence: z.number().optional(),
+  alternatives: z.array(z.string()).optional(),
 });
 
 export type RecipeData = z.infer<typeof recipeSchema>;
@@ -117,7 +119,9 @@ Always return your response as valid JSON matching this exact structure:
     "carbs": "Xg", 
     "fat": "Xg"
   },
-  "tags": ["tag1", "tag2"]
+  "tags": ["tag1", "tag2"],
+  "confidence": number (0.0 to 1.0, your confidence in the dish identification),
+  "alternatives": ["Alternative dish name 1", "Alternative dish name 2", "Alternative dish name 3"] (other possible dishes this could be)
 }`;
 
         let userContent = "Please analyze this food image and provide a complete recipe.";

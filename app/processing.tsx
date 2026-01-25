@@ -48,21 +48,25 @@ export default function ProcessingScreen() {
   const analyzeRecipe = trpc.recipe.analyze.useMutation({
     onSuccess: (data) => {
       if (data.success && data.recipe) {
-        // Navigate to recipe card with the AI results
+        // Navigate to refinement screen to verify dish name
         router.replace({
-          pathname: "/recipe-card" as any,
+          pathname: "/refinement" as any,
           params: {
             imageUri: params.imageUri || "",
             dishName: data.recipe.dishName,
-            description: data.recipe.description,
-            cuisine: data.recipe.cuisine || "",
-            difficulty: data.recipe.difficulty,
-            prepTime: String(data.recipe.prepTime),
-            cookTime: String(data.recipe.cookTime),
-            servings: String(data.recipe.servings),
-            ingredients: JSON.stringify(data.recipe.ingredients),
-            steps: JSON.stringify(data.recipe.steps),
-            tags: JSON.stringify(data.recipe.tags || []),
+            confidence: String(data.recipe.confidence || 0.85),
+            alternatives: JSON.stringify(data.recipe.alternatives || []),
+            recipeData: JSON.stringify({
+              description: data.recipe.description,
+              cuisine: data.recipe.cuisine || "",
+              difficulty: data.recipe.difficulty,
+              prepTime: data.recipe.prepTime,
+              cookTime: data.recipe.cookTime,
+              servings: data.recipe.servings,
+              ingredients: data.recipe.ingredients,
+              steps: data.recipe.steps,
+              tags: data.recipe.tags || [],
+            }),
           },
         });
       } else {

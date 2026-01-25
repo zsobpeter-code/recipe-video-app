@@ -95,3 +95,20 @@
 ## Bug Fixes
 
 - [x] Fix recipe steps rendering - display step.instruction instead of whole step object
+
+## New Features
+
+### Refinement Screen (Dish Correction)
+- [x] Create Refinement Screen between Processing and Recipe Card
+- [x] Show AI-detected dish name with confidence score
+- [x] Add "Is this correct?" with Yes/No buttons
+- [x] Add text input for manual dish name correction
+- [x] Show alternative suggestions from AI
+- [x] Add Confirm button to proceed with corrected name
+- [x] Update Processing Screen to navigate to Refinement
+
+### Mock Video Generation Flow
+- [x] Fix Paywall mock purchase to work smoothly
+- [x] Ensure Video Generation shows progress animation
+- [x] Add placeholder/demo video to Video Player
+- [x] Make full flow testable end-to-end

@@ -134,6 +134,7 @@ export default function RootLayout() {
             <Stack.Screen name="oauth/callback" />
             <Stack.Screen name="input-details" options={{ presentation: "card" }} />
             <Stack.Screen name="processing" options={{ presentation: "fullScreenModal", gestureEnabled: false }} />
+            <Stack.Screen name="refinement" options={{ presentation: "card" }} />
             <Stack.Screen name="recipe-card" options={{ presentation: "card" }} />
             <Stack.Screen name="paywall" options={{ presentation: "fullScreenModal" }} />
             <Stack.Screen name="video-generation" options={{ presentation: "fullScreenModal", gestureEnabled: false }} />

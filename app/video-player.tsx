@@ -42,14 +42,29 @@ export default function VideoPlayerScreen() {
     if (params.recipeData) {
       try {
         const data = JSON.parse(params.recipeData);
-        const parsedSteps: RecipeStep[] = JSON.parse(data.steps || "[]").map(
-          (instruction: string, index: number) => ({
-            number: index + 1,
-            instruction,
-            duration: `${Math.floor(Math.random() * 3) + 1}:${String(Math.floor(Math.random() * 60)).padStart(2, "0")}`,
-          })
+        const rawSteps = data.steps ? (typeof data.steps === 'string' ? JSON.parse(data.steps) : data.steps) : [];
+        const parsedSteps: RecipeStep[] = rawSteps.map(
+          (step: string | { stepNumber?: number; instruction: string; duration?: number }, index: number) => {
+            // Handle both string steps and object steps
+            if (typeof step === 'string') {
+              return {
+                number: index + 1,
+                instruction: step,
+                duration: `${Math.floor(Math.random() * 3) + 1}:${String(Math.floor(Math.random() * 60)).padStart(2, "0")}`,
+              };
+            }
+            return {
+              number: step.stepNumber || index + 1,
+              instruction: step.instruction,
+              duration: step.duration ? `${Math.floor(step.duration / 60)}:${String(step.duration % 60).padStart(2, "0")}` : `${Math.floor(Math.random() * 3) + 1}:${String(Math.floor(Math.random() * 60)).padStart(2, "0")}`,
+            };
+          }
         );
-        setSteps(parsedSteps);
+        if (parsedSteps.length > 0) {
+          setSteps(parsedSteps);
+        } else {
+          throw new Error("No steps found");
+        }
       } catch (error) {
         // Fallback mock steps
         setSteps([
