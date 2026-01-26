@@ -29,6 +29,7 @@ export default function VideoGenerationScreen() {
     imageUri?: string;
     userId?: string;
     recipeId?: string;
+    cachedStepVideos?: string; // JSON string of existing step videos
   }>();
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -107,6 +108,47 @@ export default function VideoGenerationScreen() {
         }
 
         setTotalSteps(steps.length);
+        
+        // Check if videos are already cached
+        if (params.cachedStepVideos) {
+          try {
+            const cachedVideos = JSON.parse(params.cachedStepVideos) as StepVideo[];
+            if (cachedVideos.length > 0 && cachedVideos.every(v => v.videoUrl && v.status === "completed")) {
+              console.log("[VideoGeneration] Using cached videos:", cachedVideos.length);
+              setStepVideos(cachedVideos);
+              setCurrentStepIndex(steps.length - 1);
+              setStatusMessage("Videos ready!");
+              
+              // Update progress to 100%
+              Animated.timing(progressValue, {
+                toValue: 100,
+                duration: 500,
+                useNativeDriver: false,
+              }).start();
+              
+              // Mark as complete and navigate
+              setIsComplete(true);
+              if (Platform.OS !== "web") {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              }
+              
+              setTimeout(() => {
+                router.replace({
+                  pathname: "/video-player" as any,
+                  params: {
+                    dishName: params.dishName,
+                    recipeData: params.recipeData,
+                    imageUri: params.imageUri,
+                    stepVideos: params.cachedStepVideos,
+                  },
+                });
+              }, 1000);
+              return;
+            }
+          } catch (cacheError) {
+            console.error("[VideoGeneration] Failed to parse cached videos:", cacheError);
+          }
+        }
         
         // Initialize step videos array
         const initialStepVideos: StepVideo[] = steps.map((_: any, index: number) => ({

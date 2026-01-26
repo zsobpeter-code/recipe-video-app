@@ -60,6 +60,7 @@ export default function RecipeCardScreen() {
     tags: string;
     recipeId?: string; // If viewing an existing recipe
     userId?: string; // User ID for storage
+    stepVideos?: string; // JSON string of cached step videos
   }>();
 
   // Parse JSON params
@@ -98,6 +99,17 @@ export default function RecipeCardScreen() {
   
   // Check if we have both original and generated images (for toggle)
   const hasOriginalImage = !!params.imageUri && params.imageUri.length > 0;
+  
+  // Check if videos are already cached
+  const hasVideos = (() => {
+    if (!params.stepVideos) return false;
+    try {
+      const videos = JSON.parse(params.stepVideos);
+      return Array.isArray(videos) && videos.length > 0 && videos.every((v: any) => v.videoUrl && v.status === "completed");
+    } catch {
+      return false;
+    }
+  })();
   const hasGeneratedImage = !!generatedPhotoUri;
   const canToggleImages = hasOriginalImage && hasGeneratedImage;
   
@@ -293,20 +305,38 @@ export default function RecipeCardScreen() {
     // This ensures text recipe photos are replaced with AI-generated food images
     const videoImageUri = generatedPhotoUri || displayImageUri;
     
+    const recipeDataStr = JSON.stringify({
+      dishName: params.dishName,
+      description: params.description,
+      ingredients: params.ingredients,
+      steps: params.steps,
+      prepTime: params.prepTime,
+      cookTime: params.cookTime,
+    });
+    
+    // If videos are already cached, go directly to video generation (which will skip to player)
+    if (hasVideos) {
+      router.push({
+        pathname: "/video-generation" as any,
+        params: {
+          dishName: params.dishName,
+          recipeData: recipeDataStr,
+          imageUri: videoImageUri,
+          cachedStepVideos: params.stepVideos,
+          userId: params.userId || "anonymous",
+          recipeId: savedRecipeId || params.recipeId || `temp_${Date.now()}`,
+        },
+      });
+      return;
+    }
+    
     // Navigate to paywall with recipe data
     // Include userId and recipeId for video storage
     router.push({
       pathname: "/paywall" as any,
       params: {
         dishName: params.dishName,
-        recipeData: JSON.stringify({
-          dishName: params.dishName,
-          description: params.description,
-          ingredients: params.ingredients,
-          steps: params.steps,
-          prepTime: params.prepTime,
-          cookTime: params.cookTime,
-        }),
+        recipeData: recipeDataStr,
         imageUri: videoImageUri,
         hasGeneratedPhoto: generatedPhotoUri ? "true" : "false",
         userId: params.userId || "anonymous",
@@ -726,8 +756,8 @@ export default function RecipeCardScreen() {
           style={{ flex: 1 }}
         />
         <SecondaryButton
-          title="Video"
-          subtitle="$4.99"
+          title={hasVideos ? "Watch Video" : "Video"}
+          subtitle={hasVideos ? undefined : "$4.99"}
           onPress={handleGenerateVideo}
           icon={<IconSymbol name="video.fill" size={16} color="#C9A962" />}
           style={{ flex: 1 }}

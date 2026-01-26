@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { 
   View, 
   Text, 
@@ -53,6 +53,8 @@ export default function CookModeScreen() {
     imageUri?: string;
     recipeId?: string;
     stepImages?: string;
+    stepVideos?: string; // JSON string of cached step videos
+    userId?: string;
   }>();
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -64,6 +66,17 @@ export default function CookModeScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [showIngredientsModal, setShowIngredientsModal] = useState(false);
+  
+  // Check if videos are already cached
+  const hasVideos = useMemo(() => {
+    if (!params.stepVideos) return false;
+    try {
+      const videos = JSON.parse(params.stepVideos);
+      return Array.isArray(videos) && videos.length > 0 && videos.every((v: any) => v.videoUrl && v.status === "completed");
+    } catch {
+      return false;
+    }
+  }, [params.stepVideos]);
   
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -275,6 +288,22 @@ export default function CookModeScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
     
+    // If videos are already cached, go directly to video player
+    if (hasVideos) {
+      router.push({
+        pathname: "/video-generation" as any,
+        params: {
+          dishName: params.dishName,
+          recipeData: params.recipeData,
+          imageUri: params.imageUri,
+          cachedStepVideos: params.stepVideos,
+          userId: params.userId,
+          recipeId: params.recipeId,
+        },
+      });
+      return;
+    }
+    
     // Navigate to paywall for video
     router.push({
       pathname: "/paywall" as any,
@@ -283,6 +312,8 @@ export default function CookModeScreen() {
         dishName: params.dishName,
         recipeData: params.recipeData,
         imageUri: params.imageUri,
+        userId: params.userId,
+        recipeId: params.recipeId,
       },
     });
   };
@@ -453,8 +484,8 @@ export default function CookModeScreen() {
             style={{ flex: 1 }}
           />
           <PrimaryButton
-            title="Video"
-            subtitle="$4.99"
+            title={hasVideos ? "Watch Video" : "Video"}
+            subtitle={hasVideos ? undefined : "$4.99"}
             onPress={handleGenerateVideo}
             style={{ flex: 1 }}
           />

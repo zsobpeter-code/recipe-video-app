@@ -376,3 +376,17 @@
 - [ ] Recipe record has step_videos array with permanent URLs
 - [ ] Video player loads from Supabase URL
 - [ ] Re-opening recipe plays stored video without regenerating
+
+## Feature: Video Caching Check
+
+### Phase 1: Caching Logic
+- [x] Check if step_videos already exist before generating
+- [x] Skip generation if videos are cached
+- [x] Show "complete" progress immediately for cached videos
+- [x] Navigate directly to video player with cached videos
+
+### Phase 2: UI Updates
+- [x] Update Cook Mode bottom bar to show "Watch Video" if cached
+- [x] Update Recipe Card Video button to show different state
+- [x] Remove price display for already-generated videos
+- [x] Skip paywall and go directly to video player for cached videos
