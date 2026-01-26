@@ -100,10 +100,36 @@ export default function VideoGenerationScreen() {
       try {
         // Parse recipe data
         const recipeData = JSON.parse(params.recipeData);
-        const steps = recipeData.steps || [];
+        console.log("[VideoGeneration] Parsed recipe data:", {
+          hasSteps: !!recipeData.steps,
+          stepsType: typeof recipeData.steps,
+          stepsIsArray: Array.isArray(recipeData.steps),
+        });
         
-        if (steps.length === 0) {
+        // Parse steps - handle multiple formats
+        let steps: any[] = [];
+        
+        if (recipeData.steps) {
+          if (Array.isArray(recipeData.steps)) {
+            steps = recipeData.steps;
+          } else if (typeof recipeData.steps === "string") {
+            // Steps might be a JSON string
+            try {
+              const parsed = JSON.parse(recipeData.steps);
+              if (Array.isArray(parsed)) {
+                steps = parsed;
+              }
+            } catch {
+              console.error("[VideoGeneration] Steps is a string but not valid JSON");
+            }
+          }
+        }
+        
+        console.log("[VideoGeneration] Parsed steps count:", steps.length);
+        
+        if (!Array.isArray(steps) || steps.length === 0) {
           setStatusMessage("No steps found in recipe");
+          console.error("[VideoGeneration] No valid steps found");
           return;
         }
 

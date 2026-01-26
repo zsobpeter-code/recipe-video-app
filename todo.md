@@ -390,3 +390,17 @@
 - [x] Update Recipe Card Video button to show different state
 - [x] Remove price display for already-generated videos
 - [x] Skip paywall and go directly to video player for cached videos
+
+## Critical Bug Fix - Recipe Data Not Loading
+
+### Symptoms
+- [x] "STEP 1 OF 0" - steps array is empty or undefined
+- [x] "Loading..." stuck - recipe not loading
+- [x] "501 steps" - incorrect step count (reading wrong field)
+- [x] TypeError during video generation
+
+### Fixes Applied
+- [x] Add debug logging to Cook Mode, Video Generation, and Video Player
+- [x] Handle steps as both array and JSON string
+- [x] Guard against undefined/empty steps with error logging
+- [x] Use Array.isArray check before accessing steps.length

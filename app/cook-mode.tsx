@@ -97,29 +97,89 @@ export default function CookModeScreen() {
     if (params.recipeData) {
       try {
         const data = JSON.parse(params.recipeData);
+        console.log("[CookMode] Parsed recipe data:", {
+          hasSteps: !!data.steps,
+          stepsType: typeof data.steps,
+          stepsIsArray: Array.isArray(data.steps),
+          stepsLength: Array.isArray(data.steps) ? data.steps.length : "N/A",
+        });
         
-        // Parse steps
-        if (data.steps && Array.isArray(data.steps)) {
-          const parsedSteps = data.steps.map((step: any, index: number) => ({
-            number: step.stepNumber || index + 1,
-            instruction: step.instruction || step,
-            duration: step.duration ? `${step.duration} min` : "",
-            durationSeconds: (step.duration || 0) * 60,
-          }));
-          setSteps(parsedSteps);
+        // Parse steps - handle multiple formats
+        let stepsArray: any[] = [];
+        
+        if (data.steps) {
+          if (Array.isArray(data.steps)) {
+            stepsArray = data.steps;
+          } else if (typeof data.steps === "string") {
+            // Steps might be a JSON string
+            try {
+              const parsed = JSON.parse(data.steps);
+              if (Array.isArray(parsed)) {
+                stepsArray = parsed;
+              }
+            } catch {
+              console.error("[CookMode] Steps is a string but not valid JSON");
+            }
+          }
         }
         
-        // Parse ingredients
-        if (data.ingredients && Array.isArray(data.ingredients)) {
-          const parsedIngredients = data.ingredients.map((ing: any) => ({
-            name: ing.name || ing,
-            amount: ing.amount || "",
-            unit: ing.unit || "",
-          }));
+        if (stepsArray.length > 0) {
+          const parsedSteps = stepsArray.map((step: any, index: number) => {
+            // Handle both string steps and object steps
+            if (typeof step === "string") {
+              return {
+                number: index + 1,
+                instruction: step,
+                duration: "",
+                durationSeconds: 0,
+              };
+            }
+            return {
+              number: step.stepNumber || index + 1,
+              instruction: step.instruction || String(step),
+              duration: step.duration ? `${step.duration} min` : "",
+              durationSeconds: (step.duration || 0) * 60,
+            };
+          });
+          console.log("[CookMode] Parsed steps:", parsedSteps.length);
+          setSteps(parsedSteps);
+        } else {
+          console.error("[CookMode] No valid steps found in recipe data");
+        }
+        
+        // Parse ingredients - handle multiple formats
+        let ingredientsArray: any[] = [];
+        
+        if (data.ingredients) {
+          if (Array.isArray(data.ingredients)) {
+            ingredientsArray = data.ingredients;
+          } else if (typeof data.ingredients === "string") {
+            try {
+              const parsed = JSON.parse(data.ingredients);
+              if (Array.isArray(parsed)) {
+                ingredientsArray = parsed;
+              }
+            } catch {
+              console.error("[CookMode] Ingredients is a string but not valid JSON");
+            }
+          }
+        }
+        
+        if (ingredientsArray.length > 0) {
+          const parsedIngredients = ingredientsArray.map((ing: any) => {
+            if (typeof ing === "string") {
+              return { name: ing, amount: "", unit: "" };
+            }
+            return {
+              name: ing.name || String(ing),
+              amount: ing.amount || "",
+              unit: ing.unit || "",
+            };
+          });
           setIngredients(parsedIngredients);
         }
       } catch (e) {
-        console.error("Failed to parse recipe data:", e);
+        console.error("[CookMode] Failed to parse recipe data:", e);
       }
     }
     

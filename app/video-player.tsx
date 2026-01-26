@@ -100,8 +100,33 @@ export default function VideoPlayerScreen() {
     if (params.recipeData) {
       try {
         const data = JSON.parse(params.recipeData);
-        if (data.steps && Array.isArray(data.steps)) {
-          const parsedSteps = data.steps.map((step: any, index: number) => {
+        console.log("[VideoPlayer] Parsed recipe data:", {
+          hasSteps: !!data.steps,
+          stepsType: typeof data.steps,
+          stepsIsArray: Array.isArray(data.steps),
+        });
+        
+        // Parse steps - handle multiple formats
+        let stepsArray: any[] = [];
+        
+        if (data.steps) {
+          if (Array.isArray(data.steps)) {
+            stepsArray = data.steps;
+          } else if (typeof data.steps === "string") {
+            // Steps might be a JSON string
+            try {
+              const parsed = JSON.parse(data.steps);
+              if (Array.isArray(parsed)) {
+                stepsArray = parsed;
+              }
+            } catch {
+              console.error("[VideoPlayer] Steps is a string but not valid JSON");
+            }
+          }
+        }
+        
+        if (stepsArray.length > 0) {
+          const parsedSteps = stepsArray.map((step: any, index: number) => {
             const instruction = typeof step === "string" ? step : step.instruction;
             const duration = typeof step === "object" ? step.duration : 2;
             return {
@@ -111,10 +136,13 @@ export default function VideoPlayerScreen() {
               durationSeconds: (duration || 2) * 60,
             };
           });
+          console.log("[VideoPlayer] Parsed steps:", parsedSteps.length);
           setSteps(parsedSteps);
+        } else {
+          console.error("[VideoPlayer] No valid steps found in recipe data");
         }
       } catch (e) {
-        console.error("Failed to parse recipe data:", e);
+        console.error("[VideoPlayer] Failed to parse recipe data:", e);
       }
     }
     
