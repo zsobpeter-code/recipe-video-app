@@ -21,6 +21,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { PrimaryButton } from "@/components/ui/primary-button";
 import { SecondaryButton } from "@/components/ui/secondary-button";
+import { ShareMenu } from "@/components/share-menu";
 import { trpc } from "@/lib/trpc";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -66,6 +67,7 @@ export default function CookModeScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [showIngredientsModal, setShowIngredientsModal] = useState(false);
+  const [showShareMenu, setShowShareMenu] = useState(false);
   
   // Check if videos are already cached
   const hasVideos = useMemo(() => {
@@ -437,13 +439,22 @@ export default function CookModeScreen() {
           >
             Cook Mode
           </Text>
-          <TouchableOpacity 
-            style={styles.headerButton}
-            onPress={() => setShowIngredientsModal(true)}
-            activeOpacity={0.7}
-          >
-            <IconSymbol name="list.bullet" size={22} color="#FFFFFF" />
-          </TouchableOpacity>
+          <View style={styles.headerRight}>
+            <TouchableOpacity 
+              style={styles.headerButton}
+              onPress={() => setShowShareMenu(true)}
+              activeOpacity={0.7}
+            >
+              <IconSymbol name="square.and.arrow.up" size={20} color="#C9A962" />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.headerButton}
+              onPress={() => setShowIngredientsModal(true)}
+              activeOpacity={0.7}
+            >
+              <IconSymbol name="list.bullet" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Recipe Title */}
@@ -615,6 +626,26 @@ export default function CookModeScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Share Menu */}
+      <ShareMenu
+        visible={showShareMenu}
+        onClose={() => setShowShareMenu(false)}
+        recipe={{
+          dishName: params.dishName || "Recipe",
+          description: params.recipeData ? JSON.parse(params.recipeData).description : undefined,
+          cuisine: params.recipeData ? JSON.parse(params.recipeData).cuisine : undefined,
+          difficulty: params.recipeData ? JSON.parse(params.recipeData).difficulty : undefined,
+          prepTime: params.recipeData ? JSON.parse(params.recipeData).prepTime : undefined,
+          cookTime: params.recipeData ? JSON.parse(params.recipeData).cookTime : undefined,
+          servings: params.recipeData ? JSON.parse(params.recipeData).servings : undefined,
+          ingredients: ingredients,
+          steps: steps.map(s => s.instruction),
+          imageUrl: params.imageUri,
+          stepImages: stepImages,
+          finalVideoUrl: undefined,
+        }}
+      />
     </View>
   );
 }
@@ -657,6 +688,10 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.1)",
     alignItems: "center",
     justifyContent: "center",
+  },
+  headerRight: {
+    flexDirection: "row",
+    gap: 8,
   },
   headerTitle: {
     fontSize: 17,

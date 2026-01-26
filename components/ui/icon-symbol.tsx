@@ -22,6 +22,7 @@ const MAPPING = {
   
   // Actions
   "paperplane.fill": "send",
+  "square.and.arrow.up": "share",
   "chevron.left.forwardslash.chevron.right": "code",
   "chevron.right": "chevron-right",
   "chevron.left": "chevron-left",

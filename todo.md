@@ -563,3 +563,32 @@ After generating individual step videos, concatenate them into a single video fi
 ### Issue 5: Video requires Photo first
 - [x] Improve alert message to explain why photos are needed
 - [x] Add "Generate Photos & Video" combined option
+
+
+## Feature - Share System Integration
+
+### Part 1: Update Share Service
+- [x] recipeShareService.ts already has shareRecipeCardImage, shareAIPhoto, shareRecipePDF, shareVideo functions
+- [x] Using expo-print for PDF generation (works in Expo Go)
+
+### Part 2: Update ShareMenu Component
+- [x] ShareMenu uses updated share service functions
+- [x] Loading indicators for each share option
+- [x] Show/hide options based on available content (AI photo, video)
+
+### Part 3: Integrate Share Button
+- [x] Add share button to recipe-card header (gold color)
+- [x] Add share button to cook-mode header (gold color)
+- [x] Update share button in video-player to use gold color
+
+### Testing
+- [x] Share button visible on recipe card header
+- [x] Share button visible in Cook Mode header
+- [x] Share button visible in Video Player
+- [ ] Share menu opens with all available options
+- [ ] Recipe Card share works (image)
+- [ ] AI Photo share works
+- [ ] PDF share works
+- [ ] Video share works (if video exists)
+- [ ] Loading indicators show during share
+- [ ] Cancel button closes menu

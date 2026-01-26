@@ -438,7 +438,7 @@ export default function VideoPlayerScreen() {
           onPress={handleShare}
           activeOpacity={0.7}
         >
-          <IconSymbol name="paperplane.fill" size={20} color="#FFFFFF" />
+          <IconSymbol name="square.and.arrow.up" size={20} color="#C9A962" />
         </TouchableOpacity>
       </View>
 

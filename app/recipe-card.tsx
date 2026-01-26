@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { PrimaryButton, SecondaryButton, GlassmorphismCard } from "@/components/ui";
+import { ShareMenu } from "@/components/share-menu";
 import { trpc } from "@/lib/trpc";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -97,6 +98,7 @@ export default function RecipeCardScreen() {
   const [showOriginalImage, setShowOriginalImage] = useState(false); // Toggle between original and AI-generated
   const [isFavorite, setIsFavorite] = useState(false); // Favorite status
   const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
+  const [showShareMenu, setShowShareMenu] = useState(false);
   
   // Check if we have both original and generated images (for toggle)
   const hasOriginalImage = !!params.imageUri && params.imageUri.length > 0;
@@ -542,18 +544,27 @@ export default function RecipeCardScreen() {
         >
           <IconSymbol name="chevron.left" size={24} color="#FFFFFF" />
         </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.headerButton, isTogglingFavorite && { opacity: 0.5 }]}
-          onPress={handleToggleFavorite}
-          disabled={isTogglingFavorite}
-          activeOpacity={0.7}
-        >
-          <IconSymbol 
-            name={isFavorite ? "heart.fill" : "heart"} 
-            size={22} 
-            color={isFavorite ? "#C9A962" : "#FFFFFF"} 
-          />
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <TouchableOpacity 
+            style={styles.headerButton}
+            onPress={() => setShowShareMenu(true)}
+            activeOpacity={0.7}
+          >
+            <IconSymbol name="square.and.arrow.up" size={22} color="#C9A962" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.headerButton, isTogglingFavorite && { opacity: 0.5 }]}
+            onPress={handleToggleFavorite}
+            disabled={isTogglingFavorite}
+            activeOpacity={0.7}
+          >
+            <IconSymbol 
+              name={isFavorite ? "heart.fill" : "heart"} 
+              size={22} 
+              color={isFavorite ? "#C9A962" : "#FFFFFF"} 
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Content */}
@@ -782,6 +793,27 @@ export default function RecipeCardScreen() {
           style={{ flex: 1 }}
         />
       </View>
+
+      {/* Share Menu */}
+      <ShareMenu
+        visible={showShareMenu}
+        onClose={() => setShowShareMenu(false)}
+        recipe={{
+          id: savedRecipeId || undefined,
+          dishName: params.dishName || "Recipe",
+          description: params.description,
+          cuisine: params.cuisine,
+          difficulty: params.difficulty,
+          prepTime: parseInt(params.prepTime || "0"),
+          cookTime: parseInt(params.cookTime || "0"),
+          servings: parseInt(params.servings || "4"),
+          ingredients: ingredients,
+          steps: steps.map(s => s.instruction),
+          imageUrl: generatedPhotoUri || params.imageUri,
+          stepImages: params.stepImages ? JSON.parse(params.stepImages) : undefined,
+          finalVideoUrl: undefined, // TODO: Load from saved recipe
+        }}
+      />
     </View>
   );
 }
@@ -879,6 +911,10 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.4)",
     justifyContent: "center",
     alignItems: "center",
+  },
+  headerRight: {
+    flexDirection: "row",
+    gap: 8,
   },
   scrollView: {
     flex: 1,
