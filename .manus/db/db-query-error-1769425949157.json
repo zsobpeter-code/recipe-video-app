@@ -1,0 +1,8 @@
+{
+  "query": "ALTER TABLE recipes \nADD COLUMN IF NOT EXISTS video_url TEXT,\nADD COLUMN IF NOT EXISTS video_thumbnail_url TEXT,\nADD COLUMN IF NOT EXISTS video_generated_at TIMESTAMP;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Y8uXt1ZXNg68oi.3be591ccdb66 --database EX9vsVAqCnKwySKcwPNXcB --execute ALTER TABLE recipes \nADD COLUMN IF NOT EXISTS video_url TEXT,\nADD COLUMN IF NOT EXISTS video_thumbnail_url TEXT,\nADD COLUMN IF NOT EXISTS video_generated_at TIMESTAMP;",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1146 (42S02) at line 1: Table 'ex9vsvaqcnkwyskcwpnxcb.recipes' doesn't exist"
+  ]
+}

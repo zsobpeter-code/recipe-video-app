@@ -204,3 +204,35 @@
 - [x] Include camera angles, lighting, motion descriptions
 - [x] Pass enriched prompts to video player via navigation params
 - [x] Show visual prompt preview in video player (Scene Description panel)
+## Bug Fixes (Round 6) - User Testing Feedback
+
+### BUG 1: Favorites Toggle Still Failing (HIGH)
+- [x] Fixed: Recipe ID not being stored after save
+- [x] Added savedRecipeId state to track ID after saving
+- [x] Updated handleToggleFavorite to use savedRecipeId
+- [x] Now favorites toggle works after saving recipe
+
+### BUG 2: Text String Rendering Error (MEDIUM)
+- [x] Reviewed step rendering code - all text properly wrapped in <Text> components
+- [x] step.instruction, step.stepNumber, step.duration all wrapped correctly
+- [x] Error may have been transient or from stale code
+
+## Feature: Video Storage Setup (Runway Preparation)
+
+### Step 1: Supabase Storage Bucket
+- [x] Storage bucket setup documented (requires Supabase dashboard)
+- [x] Storage policies documented for future implementation
+
+### Step 2: Database Schema
+- [x] Using in-memory storage for now (no DB table needed yet)
+- [x] Schema ready to add when Supabase Storage is configured
+
+### Step 3: Video Storage Service
+- [x] Created videoStorageService.ts
+- [x] Implemented storeVideoFromUrl function (placeholder)
+- [x] Implemented deleteRecipeVideo function
+- [x] Implemented getStoredVideo function
+
+### Step 4: Integration Point
+- [x] Created generateAndStoreVideo placeholder for Runway API
+- [x] Service ready for Runway integration

@@ -88,6 +88,7 @@ export default function RecipeCardScreen() {
   const [expandedSection, setExpandedSection] = useState<"ingredients" | "steps" | null>("ingredients");
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(!!params.recipeId);
+  const [savedRecipeId, setSavedRecipeId] = useState<string | null>(params.recipeId || null);
   const [isGeneratingPhoto, setIsGeneratingPhoto] = useState(false);
   const [generatedPhotoUri, setGeneratedPhotoUri] = useState<string | null>(null);
   const [showOriginalImage, setShowOriginalImage] = useState(false); // Toggle between original and AI-generated
@@ -110,8 +111,10 @@ export default function RecipeCardScreen() {
   const toggleFavoriteMutation = trpc.recipe.toggleFavorite.useMutation();
 
   const handleToggleFavorite = async () => {
-    // Only allow toggling if recipe is saved
-    if (!params.recipeId) {
+    // Only allow toggling if recipe is saved (either from params or after saving)
+    const recipeIdToUse = savedRecipeId || params.recipeId;
+    
+    if (!recipeIdToUse) {
       Alert.alert(
         "Save First",
         "Please save this recipe to your collection before adding it to favorites.",
@@ -127,7 +130,7 @@ export default function RecipeCardScreen() {
     setIsTogglingFavorite(true);
 
     try {
-      const result = await toggleFavoriteMutation.mutateAsync({ id: params.recipeId });
+      const result = await toggleFavoriteMutation.mutateAsync({ id: recipeIdToUse });
       
       if (result.success) {
         setIsFavorite(result.isFavorite ?? !isFavorite);
@@ -364,8 +367,10 @@ export default function RecipeCardScreen() {
         originalImageUrl, // Original captured/uploaded image
       });
       
-      if (saveResult.success) {
+      if (saveResult.success && saveResult.recipe) {
         setIsSaved(true);
+        setSavedRecipeId(saveResult.recipe.id); // Store the recipe ID for favorites toggle
+        setIsFavorite(saveResult.recipe.isFavorite || false);
         
         if (Platform.OS !== "web") {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
