@@ -33,7 +33,7 @@ export default function InputDetailsScreen() {
       pathname: "/processing",
       params: {
         imageUri: imageUri || "",
-        dishName: dishName.trim() || "Untitled Dish",
+        dishName: dishName.trim(),
         userNotes: userNotes.trim(),
         source: source || "camera",
       }

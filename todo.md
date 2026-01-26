@@ -277,3 +277,22 @@
 - [x] Show paywall for $1.99 step photos (separate pricing from video)
 - [x] Progress indicator during generation (step-photo-generation.tsx)
 - [x] Display generated step photos in Cook Mode (via stepImages param)
+
+## Bug Fixes (Round 8) - Flow & UX Fixes
+
+### Problem 1: Cook Mode Missing Ingredients
+- [x] Add ingredients button in header (top right)
+- [x] Show full ingredients modal when tapped
+- [x] Display step-specific ingredients below instruction
+- [x] Make step image static (no Ken Burns animation)
+
+#### Problem 2: Generated Photos Don't Appear
+- [x] Fixed: Photo generation now uses separate endpoint (not video enrichment)
+- [x] Fixed: Added "View Recipe with Photos" button after generation
+- [x] Fixed: stepImages passed to cook-mode via navigation params on completion screen
+
+### Problem 3: "Untitled Dish (Name)" Formatting
+- [x] Updated Claude prompt to explicitly require actual dish names
+- [x] Removed "Untitled Dish" default from input-details.tsx
+- [x] Claude now instructed to never use generic names like "Untitled Dish"
+- [ ] Apply fix in recipe recognition flow

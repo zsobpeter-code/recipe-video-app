@@ -10,18 +10,12 @@ import {
   Share,
   Alert,
   ActivityIndicator,
+  Modal,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withRepeat,
-  withSequence,
-  Easing,
-} from "react-native-reanimated";
+// Removed animation imports - Cook Mode uses static images
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenContainer } from "@/components/screen-container";
@@ -38,6 +32,12 @@ interface RecipeStep {
   duration: string;
   durationSeconds: number;
   imageUrl?: string;
+}
+
+interface Ingredient {
+  name: string;
+  amount: string;
+  unit?: string;
 }
 
 interface StepImage {
@@ -66,12 +66,21 @@ export default function CookModeScreen() {
   const [isGeneratingPhotos, setIsGeneratingPhotos] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [currentGeneratingStep, setCurrentGeneratingStep] = useState(0);
+  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+  const [showIngredientsModal, setShowIngredientsModal] = useState(false);
   
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Ken Burns animation
-  const scale = useSharedValue(1);
-  const translateX = useSharedValue(0);
+  // Helper: Extract ingredients mentioned in a step
+  const extractIngredientsForStep = (stepText: string): Ingredient[] => {
+    if (!stepText || ingredients.length === 0) return [];
+    const stepLower = stepText.toLowerCase();
+    return ingredients.filter(ing => 
+      stepLower.includes(ing.name.toLowerCase())
+    );
+  };
+
+  // Static image mode - no animation values needed
 
   // tRPC mutations
   const saveMutation = trpc.recipe.save.useMutation();
@@ -81,6 +90,8 @@ export default function CookModeScreen() {
     if (params.recipeData) {
       try {
         const data = JSON.parse(params.recipeData);
+        
+        // Parse steps
         if (data.steps) {
           let parsedSteps: RecipeStep[];
           if (typeof data.steps === "string") {
@@ -97,8 +108,25 @@ export default function CookModeScreen() {
             durationSeconds: step.durationSeconds || step.seconds || 120,
             imageUrl: step.imageUrl,
           }));
-          
           setSteps(normalizedSteps);
+        }
+        
+        // Parse ingredients
+        if (data.ingredients) {
+          let parsedIngredients: Ingredient[];
+          if (typeof data.ingredients === "string") {
+            parsedIngredients = JSON.parse(data.ingredients);
+          } else {
+            parsedIngredients = data.ingredients;
+          }
+          
+          // Normalize ingredients
+          const normalizedIngredients = parsedIngredients.map((ing: any) => ({
+            name: ing.name || ing.ingredient || String(ing),
+            amount: ing.amount || ing.quantity || "",
+            unit: ing.unit || "",
+          }));
+          setIngredients(normalizedIngredients);
         }
       } catch (e) {
         console.error("Failed to parse recipe data:", e);
@@ -116,25 +144,7 @@ export default function CookModeScreen() {
     }
   }, [params.recipeData, params.stepImages]);
 
-  // Start Ken Burns animation
-  useEffect(() => {
-    scale.value = withRepeat(
-      withSequence(
-        withTiming(1.1, { duration: 8000, easing: Easing.inOut(Easing.ease) }),
-        withTiming(1, { duration: 8000, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      true
-    );
-    translateX.value = withRepeat(
-      withSequence(
-        withTiming(10, { duration: 8000, easing: Easing.inOut(Easing.ease) }),
-        withTiming(-10, { duration: 8000, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      true
-    );
-  }, []);
+  // Static image - no animation (removed Ken Burns effect)
 
   // Timer logic
   useEffect(() => {
@@ -162,12 +172,7 @@ export default function CookModeScreen() {
     setIsTimerRunning(false);
   }, [currentStepIndex]);
 
-  const kenBurnsStyle = useAnimatedStyle(() => ({
-    transform: [
-      { scale: scale.value },
-      { translateX: translateX.value },
-    ],
-  }));
+  // Static image - no animation style needed
 
   const currentStep = steps[currentStepIndex];
   
@@ -333,23 +338,23 @@ export default function CookModeScreen() {
         </Text>
         <TouchableOpacity 
           style={styles.headerButton}
-          onPress={handleShare}
+          onPress={() => setShowIngredientsModal(true)}
           activeOpacity={0.7}
         >
-          <IconSymbol name="paperplane.fill" size={22} color="#FFFFFF" />
+          <IconSymbol name="list.bullet" size={22} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
 
-      {/* Step Image */}
+      {/* Step Image - Static */}
       <View style={styles.imageContainer}>
         {stepImage ? (
-          <Animated.View style={[styles.imageWrapper, kenBurnsStyle]}>
+          <View style={styles.imageWrapper}>
             <Image
               source={{ uri: stepImage }}
               style={styles.stepImage}
               contentFit="cover"
             />
-          </Animated.View>
+          </View>
         ) : (
           <View style={styles.imagePlaceholder}>
             <IconSymbol name="photo.fill" size={48} color="#555555" />
@@ -410,6 +415,25 @@ export default function CookModeScreen() {
             <Text style={[styles.durationText, { fontFamily: "Inter" }]}>
               {currentStep.duration}
             </Text>
+          </View>
+        )}
+        
+        {/* Step-specific Ingredients */}
+        {currentStep && extractIngredientsForStep(currentStep.instruction).length > 0 && (
+          <View style={styles.stepIngredients}>
+            <Text style={[styles.stepIngredientsLabel, { fontFamily: "Inter-Medium" }]}>
+              Ingredients for this step:
+            </Text>
+            {extractIngredientsForStep(currentStep.instruction).map((ing, index) => (
+              <View key={index} style={styles.stepIngredientRow}>
+                <Text style={[styles.stepIngredientAmount, { fontFamily: "Inter-Medium" }]}>
+                  {ing.amount}{ing.unit ? ` ${ing.unit}` : ""}
+                </Text>
+                <Text style={[styles.stepIngredientName, { fontFamily: "Inter" }]}>
+                  {ing.name}
+                </Text>
+              </View>
+            ))}
           </View>
         )}
       </ScrollView>
@@ -503,6 +527,49 @@ export default function CookModeScreen() {
           </View>
         </View>
       )}
+
+      {/* Ingredients Modal */}
+      <Modal
+        visible={showIngredientsModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowIngredientsModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { fontFamily: "PlayfairDisplay-Bold" }]}>
+                All Ingredients
+              </Text>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setShowIngredientsModal(false)}
+                activeOpacity={0.7}
+              >
+                <IconSymbol name="xmark" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalContent}>
+              {ingredients.length > 0 ? (
+                ingredients.map((ing, index) => (
+                  <View key={index} style={styles.ingredientItem}>
+                    <Text style={[styles.ingredientAmount, { fontFamily: "Inter-Medium" }]}>
+                      {ing.amount}{ing.unit ? ` ${ing.unit}` : ""}
+                    </Text>
+                    <Text style={[styles.ingredientName, { fontFamily: "Inter" }]}>
+                      {ing.name}
+                    </Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={[styles.loadingText, { fontFamily: "Inter", textAlign: "center", marginTop: 40 }]}>
+                  No ingredients available
+                </Text>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -696,5 +763,87 @@ const styles = StyleSheet.create({
     height: "100%",
     backgroundColor: "#C9A962",
     borderRadius: 3,
+  },
+  stepIngredients: {
+    marginTop: 20,
+    backgroundColor: "rgba(201, 169, 98, 0.1)",
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "rgba(201, 169, 98, 0.2)",
+  },
+  stepIngredientsLabel: {
+    fontSize: 13,
+    color: "#C9A962",
+    marginBottom: 12,
+    letterSpacing: 0.5,
+  },
+  stepIngredientRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 6,
+    gap: 12,
+  },
+  stepIngredientAmount: {
+    fontSize: 14,
+    color: "#C9A962",
+    minWidth: 70,
+  },
+  stepIngredientName: {
+    fontSize: 14,
+    color: "#FFFFFF",
+    flex: 1,
+  },
+  // Ingredients Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.9)",
+  },
+  modalContainer: {
+    flex: 1,
+    paddingTop: 60,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255, 255, 255, 0.1)",
+  },
+  modalTitle: {
+    fontSize: 24,
+    color: "#FFFFFF",
+  },
+  modalCloseButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalContent: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  ingredientItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255, 255, 255, 0.05)",
+  },
+  ingredientAmount: {
+    fontSize: 16,
+    color: "#C9A962",
+    minWidth: 100,
+  },
+  ingredientName: {
+    fontSize: 16,
+    color: "#FFFFFF",
+    flex: 1,
   },
 });

@@ -102,9 +102,11 @@ When analyzing an image:
 4. Estimate prep time, cook time, and servings
 5. Suggest difficulty level based on technique complexity
 
+IMPORTANT: The dishName field MUST be the actual name of the dish (e.g., "Spaghetti Carbonara", "Chicken Tikka Masala", "Beef Tacos"). NEVER use generic names like "Untitled Dish", "Unknown Dish", or "Food Item". If you cannot identify the dish, make your best educated guess based on the visible ingredients and cooking style.
+
 Always return your response as valid JSON matching this exact structure:
 {
-  "dishName": "Name of the dish",
+  "dishName": "Actual Name of the Dish (e.g., Pad Thai, Beef Bourguignon)",
   "description": "Brief appetizing description",
   "cuisine": "Cuisine type (e.g., Italian, Japanese, Mexican)",
   "difficulty": "easy" | "medium" | "hard",

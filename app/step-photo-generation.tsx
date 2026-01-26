@@ -6,6 +6,7 @@ import {
   Platform,
   Dimensions,
   ActivityIndicator,
+  TouchableOpacity,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Image } from "expo-image";
@@ -139,19 +140,7 @@ export default function StepPhotoGenerationScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
 
-      // Navigate to cook mode with generated images
-      setTimeout(() => {
-        router.replace({
-          pathname: "/cook-mode" as any,
-          params: {
-            dishName: params.dishName,
-            recipeData: params.recipeData,
-            imageUri: params.imageUri,
-            recipeId: params.recipeId,
-            stepImages: JSON.stringify(generatedImages),
-          },
-        });
-      }, 1500);
+      // Don't auto-navigate - let user choose to view or save
     } catch (err) {
       console.error("Step photo generation error:", err);
       setError(err instanceof Error ? err.message : "Failed to generate photos");
@@ -243,9 +232,30 @@ export default function StepPhotoGenerationScreen() {
               <Text style={[styles.successText, { fontFamily: "Inter" }]}>
                 Generated {generatedImages.length} step photos
               </Text>
-              <Text style={[styles.redirectText, { fontFamily: "Inter" }]}>
-                Opening Cook Mode...
-              </Text>
+              
+              {/* Action Buttons */}
+              <View style={styles.actionButtons}>
+                <TouchableOpacity
+                  style={styles.viewButton}
+                  onPress={() => {
+                    router.replace({
+                      pathname: "/cook-mode" as any,
+                      params: {
+                        dishName: params.dishName,
+                        recipeData: params.recipeData,
+                        imageUri: params.imageUri,
+                        recipeId: params.recipeId,
+                        stepImages: JSON.stringify(generatedImages),
+                      },
+                    });
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.viewButtonText, { fontFamily: "Inter-Medium" }]}>
+                    View Recipe with Photos
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         </View>
@@ -424,6 +434,22 @@ const styles = StyleSheet.create({
   },
   thumbnailBadgeText: {
     fontSize: 10,
+    color: "#1A1A1A",
+  },
+  actionButtons: {
+    marginTop: 24,
+    width: "100%",
+    gap: 12,
+  },
+  viewButton: {
+    backgroundColor: "#C9A962",
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  viewButtonText: {
+    fontSize: 16,
     color: "#1A1A1A",
   },
 });
