@@ -62,6 +62,7 @@ export interface SavedRecipe {
   originalImageUrl: string | null; // Original captured/uploaded image (e.g., handwritten recipe)
   stepImages: string | null; // JSON string of step images with HTTPS URLs
   stepVideos: string | null; // JSON string of step videos with HTTPS URLs
+  finalVideoUrl: string | null; // URL of concatenated final video for sharing
   isFavorite: boolean;
   createdAt: string;
   updatedAt: string;
@@ -258,6 +259,7 @@ Always return your response as valid JSON matching this exact structure:
             originalImageUrl: input.originalImageUrl || null,
             stepImages: input.stepImages || null,
             stepVideos: input.stepVideos || null,
+            finalVideoUrl: null,
             isFavorite: false,
             createdAt: now,
             updatedAt: now,
@@ -444,6 +446,34 @@ Always return your response as valid JSON matching this exact structure:
           return {
             success: false,
             error: error instanceof Error ? error.message : "Failed to update step videos",
+          };
+        }
+      }),
+
+    // Update final video URL for a recipe (concatenated video for sharing)
+    updateFinalVideoUrl: publicProcedure
+      .input(z.object({
+        recipeId: z.string().describe("Recipe ID to update"),
+        finalVideoUrl: z.string().describe("URL of the concatenated final video"),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          const recipe = recipes.get(input.recipeId);
+          if (!recipe) {
+            return { success: false, error: "Recipe not found" };
+          }
+          
+          recipe.finalVideoUrl = input.finalVideoUrl;
+          recipe.updatedAt = new Date().toISOString();
+          recipes.set(input.recipeId, recipe);
+          
+          console.log(`[Recipe] Updated final video URL for ${input.recipeId}`);
+          return { success: true };
+        } catch (error) {
+          console.error("Update final video URL error:", error);
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to update final video URL",
           };
         }
       }),

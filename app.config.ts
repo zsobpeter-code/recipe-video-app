@@ -87,6 +87,12 @@ const config: ExpoConfig = {
   plugins: [
     "expo-router",
     [
+      "ffmpeg-kit-react-native",
+      {
+        package: "min-gpl",
+      },
+    ],
+    [
       "expo-audio",
       {
         microphonePermission: "Allow $(PRODUCT_NAME) to access your microphone.",

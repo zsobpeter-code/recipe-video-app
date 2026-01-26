@@ -482,3 +482,23 @@
 - [x] Add exponential backoff between retries (5s, 10s, 20s...)
 - [x] Log retry attempts for debugging
 - [x] Update generateSingleStepVideo to use new generateVideoWithRetry function
+
+
+## Feature - Video Concatenation for Social Media Sharing
+
+### Overview
+After generating individual step videos, concatenate them into a single video file for TikTok/Instagram sharing.
+
+### Implementation
+- [x] Install ffmpeg-kit-react-native package
+- [x] Configure Expo plugin in app.config.ts
+- [x] Create videoConcatService.ts with concatenateStepVideos function
+- [x] Download step videos to local cache
+- [x] Run FFmpeg concatenation command
+- [x] Add finalVideoUrl field to SavedRecipe interface
+- [x] Add updateFinalVideoUrl tRPC endpoint
+- [x] Update video generation flow to concatenate after all steps complete
+- [x] Update video player to accept finalVideoPath parameter
+- [x] Add share button with expo-sharing integration
+- [x] Add "Share to TikTok / Instagram" button in video player
+- [x] Clean up temp files after concatenation

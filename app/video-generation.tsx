@@ -13,6 +13,7 @@ import * as Haptics from "expo-haptics";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { trpc } from "@/lib/trpc";
+import { concatenateStepVideos, isFFmpegAvailable, type ConcatProgress } from "@/lib/videoConcatService";
 
 interface StepVideo {
   stepIndex: number;
@@ -38,6 +39,8 @@ export default function VideoGenerationScreen() {
   const [stepVideos, setStepVideos] = useState<StepVideo[]>([]);
   const [isComplete, setIsComplete] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Preparing video generation...");
+  const [isConcatenating, setIsConcatenating] = useState(false);
+  const [finalVideoPath, setFinalVideoPath] = useState<string | null>(null);
   const [enrichedSteps, setEnrichedSteps] = useState<Array<{
     stepNumber: number;
     originalText: string;
@@ -335,14 +338,6 @@ export default function VideoGenerationScreen() {
           }).start();
         }
 
-        // Complete
-        setIsComplete(true);
-        setStatusMessage("Video generation complete!");
-        
-        if (Platform.OS !== "web") {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        }
-
         // Save step videos to database if we have a recipe ID
         const completedVideos = generatedVideos.filter(v => v.status === "completed" && v.videoUrl);
         if (params.recipeId && completedVideos.length > 0) {
@@ -358,6 +353,57 @@ export default function VideoGenerationScreen() {
           }
         }
 
+        // Step 3: Concatenate videos into single file (native only)
+        let concatenatedVideoPath: string | null = null;
+        
+        if (completedVideos.length > 0 && isFFmpegAvailable()) {
+          setIsConcatenating(true);
+          setStatusMessage("Merging videos...");
+          
+          try {
+            // Get URLs in order
+            const videoUrls = completedVideos
+              .sort((a, b) => a.stepIndex - b.stepIndex)
+              .map(v => v.videoUrl);
+            
+            const concatResult = await concatenateStepVideos(
+              videoUrls,
+              params.recipeId || `temp_${Date.now()}`,
+              (progress: ConcatProgress) => {
+                setStatusMessage(progress.message);
+                if (progress.progress !== undefined) {
+                  Animated.timing(progressValue, {
+                    toValue: progress.progress,
+                    duration: 300,
+                    useNativeDriver: false,
+                  }).start();
+                }
+              }
+            );
+            
+            if (concatResult.success && concatResult.localPath) {
+              concatenatedVideoPath = concatResult.localPath;
+              setFinalVideoPath(concatResult.localPath);
+              console.log("[VideoGeneration] Concatenated video:", concatResult.localPath);
+            } else {
+              console.warn("[VideoGeneration] Concatenation failed:", concatResult.error);
+            }
+          } catch (concatError) {
+            console.error("[VideoGeneration] Concatenation error:", concatError);
+            // Continue without concatenated video
+          }
+          
+          setIsConcatenating(false);
+        }
+
+        // Complete
+        setIsComplete(true);
+        setStatusMessage(concatenatedVideoPath ? "Video ready to share!" : "Video generation complete!");
+        
+        if (Platform.OS !== "web") {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+
         // Navigate to video player after short delay
         setTimeout(() => {
           router.replace({
@@ -368,6 +414,7 @@ export default function VideoGenerationScreen() {
               imageUri: params.imageUri,
               enrichedSteps: enrichedSteps ? JSON.stringify(enrichedSteps) : undefined,
               stepVideos: JSON.stringify(generatedVideos),
+              finalVideoPath: concatenatedVideoPath || undefined,
             },
           });
         }, 1500);

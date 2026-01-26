@@ -30,6 +30,8 @@ import { LinearGradient } from "expo-linear-gradient";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import * as Sharing from "expo-sharing";
+import * as FileSystem from "expo-file-system/legacy";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -64,6 +66,7 @@ export default function VideoPlayerScreen() {
     enrichedSteps?: string;
     stepVideos?: string; // JSON string of step videos from Runway
     mode?: string;
+    finalVideoPath?: string; // Local path to concatenated final video
   }>();
 
   const isCookMode = params.mode === "cook";
@@ -75,6 +78,7 @@ export default function VideoPlayerScreen() {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [enrichedSteps, setEnrichedSteps] = useState<EnrichedStep[]>([]);
   const [isVideoLoading, setIsVideoLoading] = useState(false);
+  const [showFinalVideo, setShowFinalVideo] = useState(false);
   
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stepsScrollRef = useRef<ScrollView>(null);
@@ -372,6 +376,26 @@ export default function VideoPlayerScreen() {
     }
     
     try {
+      // If we have a final concatenated video, share it directly
+      if (params.finalVideoPath && Platform.OS !== "web") {
+        const isAvailable = await Sharing.isAvailableAsync();
+        
+        if (isAvailable) {
+          // Check if file exists
+          const fileInfo = await FileSystem.getInfoAsync(params.finalVideoPath);
+          
+          if (fileInfo.exists) {
+            await Sharing.shareAsync(params.finalVideoPath, {
+              mimeType: "video/mp4",
+              dialogTitle: `Share ${params.dishName || "Recipe"} Video`,
+              UTI: "public.mpeg-4",
+            });
+            return;
+          }
+        }
+      }
+      
+      // Fallback to text share
       const totalTime = steps.reduce((sum, s) => sum + s.durationSeconds, 0);
       const totalMins = Math.ceil(totalTime / 60);
       
@@ -381,6 +405,7 @@ export default function VideoPlayerScreen() {
       });
     } catch (error) {
       console.error("Share error:", error);
+      Alert.alert("Share Error", "Failed to share video. Please try again.");
     }
   };
 
@@ -560,6 +585,20 @@ export default function VideoPlayerScreen() {
           />
         </TouchableOpacity>
       </View>
+
+      {/* Share to Social Button (only if final video available) */}
+      {params.finalVideoPath && Platform.OS !== "web" && (
+        <TouchableOpacity
+          style={styles.shareToSocialButton}
+          onPress={handleShare}
+          activeOpacity={0.8}
+        >
+          <IconSymbol name="paperplane.fill" size={20} color="#1A1A1A" />
+          <Text style={[styles.shareToSocialText, { fontFamily: "Inter-Medium" }]}>
+            Share to TikTok / Instagram
+          </Text>
+        </TouchableOpacity>
+      )}
 
       {/* All Steps List */}
       <View style={styles.stepsSection}>
@@ -870,5 +909,20 @@ const styles = StyleSheet.create({
   stepDuration: {
     fontSize: 12,
     color: "#666666",
+  },
+  shareToSocialButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#C9A962",
+    marginHorizontal: 20,
+    marginVertical: 12,
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+  },
+  shareToSocialText: {
+    fontSize: 16,
+    color: "#1A1A1A",
   },
 });
