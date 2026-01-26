@@ -178,11 +178,29 @@ export default function StepPhotoGenerationScreen() {
 
   const progressPercent = steps.length > 0 ? Math.round((currentStep / steps.length) * 100) : 0;
 
+  const handleCancel = () => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    router.back();
+  };
+
   return (
     <ScreenContainer 
       edges={["top", "left", "right", "bottom"]} 
       containerClassName="bg-background"
     >
+      {/* Header with Cancel Button */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.cancelButton}
+          onPress={handleCancel}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.cancelText, { fontFamily: "Inter-Medium" }]}>Cancel</Text>
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.container}>
         {/* Preview Image */}
         <Animated.View style={[styles.imageContainer, pulseStyle]}>
@@ -305,6 +323,23 @@ export default function StepPhotoGenerationScreen() {
 }
 
 const styles = StyleSheet.create({
+  header: {
+    flexDirection: "row",
+    justifyContent: "flex-start",
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
+  },
+  cancelButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+  },
+  cancelText: {
+    fontSize: 14,
+    color: "#888888",
+  },
   container: {
     flex: 1,
     alignItems: "center",

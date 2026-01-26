@@ -61,11 +61,12 @@ const styles = StyleSheet.create({
   button: {
     backgroundColor: "#C9A962",
     borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 32,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     alignItems: "center",
     justifyContent: "center",
     minHeight: 52,
+    minWidth: 100,
   },
   fullWidth: {
     width: "100%",
@@ -83,8 +84,10 @@ const styles = StyleSheet.create({
   },
   text: {
     fontFamily: "Inter-Medium",
-    fontSize: 16,
+    fontSize: 15,
     color: "#1A1A1A",
+    flexShrink: 0,
+    textAlign: "center",
   },
   textContainer: {
     alignItems: "center",

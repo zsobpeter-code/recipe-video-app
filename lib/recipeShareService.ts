@@ -215,11 +215,11 @@ export async function shareRecipePDF(recipe: RecipeData): Promise<{ success: boo
 }
 
 /**
- * Share recipe card image (captured via ViewShot)
+ * Share recipe card image with full recipe text
  */
 export async function shareRecipeCardImage(
   imageUri: string,
-  dishName: string
+  recipe: RecipeData
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const isAvailable = await Sharing.isAvailableAsync();
@@ -227,11 +227,47 @@ export async function shareRecipeCardImage(
       return { success: false, error: "Sharing is not available on this device" };
     }
     
-    await Sharing.shareAsync(imageUri, {
-      mimeType: "image/png",
-      dialogTitle: `Share ${dishName}`,
-      UTI: "public.png",
-    });
+    // Create full recipe text to share along with image
+    const totalTime = (recipe.prepTime || 0) + (recipe.cookTime || 0);
+    const ingredientsText = recipe.ingredients
+      ?.map((i) => `• ${i.amount} ${i.name}`)
+      .join("\n") || "";
+    const stepsText = recipe.steps
+      ?.map((s, i) => `${i + 1}. ${s}`)
+      .join("\n") || "";
+    
+    const recipeText = `
+${recipe.dishName}
+${recipe.description ? `\n${recipe.description}` : ""}
+
+📝 Ingredients:
+${ingredientsText}
+
+👨‍🍳 Instructions:
+${stepsText}
+
+⏱ ${totalTime > 0 ? `${totalTime} min` : ""} | 👥 ${recipe.servings || 4} servings
+
+Made with Recipe Studio ✨
+    `.trim();
+    
+    // On iOS, we can share both image and text
+    // On Android, Share API handles this differently
+    if (Platform.OS === "ios") {
+      // iOS: Share image with message
+      const { Share } = await import("react-native");
+      await Share.share({
+        message: recipeText,
+        url: imageUri,
+      });
+    } else {
+      // Android/Web: Share image via Sharing API, then text via Share API
+      await Sharing.shareAsync(imageUri, {
+        mimeType: "image/png",
+        dialogTitle: `Share ${recipe.dishName}`,
+        UTI: "public.png",
+      });
+    }
     
     return { success: true };
   } catch (error: any) {
@@ -310,6 +346,49 @@ export async function shareVideo(
   } catch (error: any) {
     console.error("[ShareService] Video share error:", error);
     return { success: false, error: error?.message || "Failed to share video" };
+  }
+}
+
+/**
+ * Save video to camera roll
+ */
+export async function saveVideoToCameraRoll(
+  videoUrl: string,
+  dishName: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Import MediaLibrary dynamically to avoid issues on web
+    const MediaLibrary = await import("expo-media-library");
+    
+    // Request permissions
+    const { status } = await MediaLibrary.requestPermissionsAsync();
+    if (status !== "granted") {
+      return { success: false, error: "Permission to access media library was denied" };
+    }
+    
+    let localPath = videoUrl;
+    
+    // If it's a remote URL, download first
+    if (videoUrl.startsWith("https://")) {
+      localPath = `${FileSystem.cacheDirectory}${dishName.replace(/[^a-zA-Z0-9]/g, "_")}_video_save.mp4`;
+      const download = await FileSystem.downloadAsync(videoUrl, localPath);
+      
+      if (download.status !== 200) {
+        return { success: false, error: "Failed to download video" };
+      }
+    }
+    
+    // Save to camera roll
+    const asset = await MediaLibrary.createAssetAsync(localPath);
+    
+    if (asset) {
+      return { success: true };
+    } else {
+      return { success: false, error: "Failed to save video to camera roll" };
+    }
+  } catch (error: any) {
+    console.error("[ShareService] Save video error:", error);
+    return { success: false, error: error?.message || "Failed to save video" };
   }
 }
 

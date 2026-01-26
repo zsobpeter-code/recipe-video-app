@@ -45,9 +45,10 @@ describe("Video Player Bug Fixes", () => {
       expect(videoPlayerContent).toContain("onPress={handlePlayPause}");
     });
 
-    it("should have tap to play hint when paused", () => {
-      expect(videoPlayerContent).toContain("Tap to play");
-      expect(videoPlayerContent).toContain("tapHint");
+    it("should have play overlay when paused", () => {
+      // Tap to play text was removed, now just shows play icon
+      expect(videoPlayerContent).toContain("playOverlay");
+      expect(videoPlayerContent).toContain("playIconContainer");
     });
   });
 

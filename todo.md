@@ -592,3 +592,86 @@ After generating individual step videos, concatenate them into a single video fi
 - [ ] Video share works (if video exists)
 - [ ] Loading indicators show during share
 - [ ] Cancel button closes menu
+
+
+## Bug Fixes - Round 2
+
+### Issue 1 & 2: Button text wrapping
+- [ ] Increase minWidth on bottom bar buttons to 110
+- [ ] Add flexShrink: 0 to button text
+- [ ] Test Cook, Video, Photos buttons don't wrap
+
+### Issue 3: Background photo blur
+- [ ] Reduce blur in Cook Mode from 15 to 5
+- [ ] Increase background opacity to 0.7
+- [ ] Reduce overlay darkness to 0.35
+
+### Issue 4: Remove "Tap to play" text
+- [ ] Remove tap to play overlay from video player
+- [ ] Keep play icon functionality
+
+### Issue 5: Duplicate recipe saves (CRITICAL)
+- [ ] Add guard to prevent double save calls
+- [ ] Check if recipe already saved before saving
+- [ ] Ensure save isn't called in multiple places
+
+### Issue 6: Recipe card share content
+- [ ] Update shareRecipeCard to include full recipe text
+- [ ] Include ingredients and instructions in share
+- [ ] Add "Made with Recipe Studio" branding
+
+### Issue 7 & 8: Video sharing and saving
+- [ ] Fix video sharing to download and share mp4
+- [ ] Install expo-media-library
+- [ ] Add saveVideoToCameraRoll function
+- [ ] Add save button to video player
+
+### Issue 9: Cancel button position
+- [ ] Move cancel button to top-left header in generation screens
+- [ ] Make it more accessible during generation
+
+### Issue 10: Wrong time display (1520 min)
+- [ ] Add sanity check for time values > 1440 min
+- [ ] Fix time calculation/parsing
+- [ ] Format time properly (hours and minutes)
+
+
+## Bug Fixes - Round 2 (Completed)
+
+### Issue 1: Button text wrapping
+- [x] Fix SecondaryButton minWidth and flexShrink
+- [x] Fix PrimaryButton minWidth and flexShrink
+- [x] Add numberOfLines={1} to prevent wrapping
+
+### Issue 2: Background blur too heavy
+- [x] Reduce blur from 15 to 5 in Cook Mode
+- [x] Increase background opacity from 0.6 to 0.8
+- [x] Reduce overlay from 0.4 to 0.3
+
+### Issue 3: "Tap to play" text
+- [x] Remove "Tap to play" text from video player
+- [x] Keep just the play icon overlay
+
+### Issue 4: Duplicate recipe saves
+- [x] Add isSaving guard to prevent double calls
+- [x] Disable save button while saving
+
+### Issue 5: Recipe card share content
+- [x] Update shareRecipeCardImage to include full recipe text
+- [x] Include dish name, description, ingredients, and steps
+
+### Issue 6: Video sharing and saving
+- [x] Fix video sharing to properly share file
+- [x] Add "Save to Camera Roll" button
+- [x] Install expo-media-library
+- [x] Add saveVideoToCameraRoll function
+
+### Issue 7: Cancel button position
+- [x] Add cancel button to step-photo-generation header
+- [x] Add cancel button to video-generation header
+- [x] Position buttons in accessible top-left area
+
+### Issue 8: Time display
+- [x] Fix NaN handling in time calculation
+- [x] Format time as hours/minutes when >= 60 min
+- [x] Show "--" when time is 0

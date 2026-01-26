@@ -57,7 +57,7 @@ export function ShareMenu({ visible, onClose, recipe }: ShareMenuProps) {
       if (viewShotRef.current) {
         const uri = await viewShotRef.current.capture?.();
         if (uri) {
-          const result = await shareRecipeCardImage(uri, recipe.dishName);
+          const result = await shareRecipeCardImage(uri, recipe);
           if (!result.success) {
             Alert.alert("Error", result.error || "Failed to share recipe card");
           }

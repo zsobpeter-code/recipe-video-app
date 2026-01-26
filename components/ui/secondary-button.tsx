@@ -64,11 +64,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#C9A962",
     paddingVertical: 12,
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     alignItems: "center",
     justifyContent: "center",
     minHeight: 52,
-    minWidth: 90,
+    minWidth: 100,
   },
   fullWidth: {
     width: "100%",
@@ -89,6 +89,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#C9A962",
     textAlign: "center",
+    flexShrink: 0,
   },
   textContainer: {
     alignItems: "center",

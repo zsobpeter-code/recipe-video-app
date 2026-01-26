@@ -367,9 +367,12 @@ export default function RecipeCardScreen() {
   };
 
   const handleSaveToCollection = async () => {
-    if (isSaved) {
-      // Already saved, just navigate
-      router.replace("/(tabs)/collection");
+    // Prevent double tap or multiple save calls
+    if (isSaved || isSaving) {
+      if (isSaved) {
+        // Already saved, just navigate
+        router.replace("/(tabs)/collection");
+      }
       return;
     }
 
@@ -487,7 +490,21 @@ export default function RecipeCardScreen() {
     }
   };
 
-  const totalTime = (parseInt(params.prepTime || "0") + parseInt(params.cookTime || "0"));
+  // Calculate total time, handling potential NaN values
+  const prepTimeNum = parseInt(params.prepTime || "0") || 0;
+  const cookTimeNum = parseInt(params.cookTime || "0") || 0;
+  const totalTime = prepTimeNum + cookTimeNum;
+  
+  // Format time display (show hours if >= 60 minutes)
+  const formatTimeDisplay = (minutes: number): string => {
+    if (minutes === 0) return "--";
+    if (minutes >= 60) {
+      const hours = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+      return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+    }
+    return `${minutes} min`;
+  };
 
   return (
     <View style={styles.container}>
@@ -640,7 +657,7 @@ export default function RecipeCardScreen() {
             <View style={styles.stat}>
               <IconSymbol name="clock.fill" size={20} color="#C9A962" />
               <Text style={[styles.statValue, { fontFamily: "Inter-Medium" }]}>
-                {totalTime} min
+                {formatTimeDisplay(totalTime)}
               </Text>
               <Text style={[styles.statLabel, { fontFamily: "Inter" }]}>Total</Text>
             </View>

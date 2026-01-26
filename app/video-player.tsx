@@ -32,6 +32,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import * as Sharing from "expo-sharing";
 import * as FileSystem from "expo-file-system/legacy";
+import { saveVideoToCameraRoll } from "@/lib/recipeShareService";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -79,6 +80,7 @@ export default function VideoPlayerScreen() {
   const [enrichedSteps, setEnrichedSteps] = useState<EnrichedStep[]>([]);
   const [isVideoLoading, setIsVideoLoading] = useState(false);
   const [showFinalVideo, setShowFinalVideo] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stepsScrollRef = useRef<ScrollView>(null);
@@ -409,6 +411,40 @@ export default function VideoPlayerScreen() {
     }
   };
 
+  const handleSaveVideo = async () => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    
+    if (!params.finalVideoPath) {
+      Alert.alert("No Video", "No video available to save.");
+      return;
+    }
+    
+    setIsSaving(true);
+    
+    try {
+      const result = await saveVideoToCameraRoll(
+        params.finalVideoPath,
+        params.dishName || "Recipe"
+      );
+      
+      if (result.success) {
+        if (Platform.OS !== "web") {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+        Alert.alert("Saved!", "Video saved to your camera roll.");
+      } else {
+        Alert.alert("Error", result.error || "Failed to save video.");
+      }
+    } catch (error) {
+      console.error("Save video error:", error);
+      Alert.alert("Error", "Failed to save video. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleStepPress = (index: number) => {
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -489,16 +525,16 @@ export default function VideoPlayerScreen() {
           </Text>
         </View>
         
-        {/* Tap hint */}
+        {/* Play button overlay */}
         {!isPlaying && (
           <TouchableOpacity 
-            style={styles.tapHint}
+            style={styles.playOverlay}
             onPress={handlePlayPause}
             activeOpacity={0.8}
           >
-            <Text style={[styles.tapHintText, { fontFamily: "Inter" }]}>
-              Tap to play
-            </Text>
+            <View style={styles.playIconContainer}>
+              <IconSymbol name="play.fill" size={40} color="#FFFFFF" />
+            </View>
           </TouchableOpacity>
         )}
       </View>
@@ -586,18 +622,36 @@ export default function VideoPlayerScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Share to Social Button (only if final video available) */}
+      {/* Share and Save Buttons (only if final video available) */}
       {params.finalVideoPath && Platform.OS !== "web" && (
-        <TouchableOpacity
-          style={styles.shareToSocialButton}
-          onPress={handleShare}
-          activeOpacity={0.8}
-        >
-          <IconSymbol name="paperplane.fill" size={20} color="#1A1A1A" />
-          <Text style={[styles.shareToSocialText, { fontFamily: "Inter-Medium" }]}>
-            Share to TikTok / Instagram
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.videoActionButtons}>
+          <TouchableOpacity
+            style={styles.shareToSocialButton}
+            onPress={handleShare}
+            activeOpacity={0.8}
+          >
+            <IconSymbol name="paperplane.fill" size={20} color="#1A1A1A" />
+            <Text style={[styles.shareToSocialText, { fontFamily: "Inter-Medium" }]}>
+              Share
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.saveToRollButton, isSaving && { opacity: 0.7 }]}
+            onPress={handleSaveVideo}
+            activeOpacity={0.8}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <ActivityIndicator size="small" color="#C9A962" />
+            ) : (
+              <IconSymbol name="arrow.down.circle.fill" size={20} color="#C9A962" />
+            )}
+            <Text style={[styles.saveToRollText, { fontFamily: "Inter-Medium" }]}>
+              Save
+            </Text>
+          </TouchableOpacity>
+        </View>
       )}
 
       {/* All Steps List */}
@@ -745,18 +799,22 @@ const styles = StyleSheet.create({
     color: "#1A1A1A",
     letterSpacing: 1,
   },
-  tapHint: {
+  playOverlay: {
     position: "absolute",
-    bottom: 20,
-    alignSelf: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  tapHintText: {
-    fontSize: 13,
-    color: "#FFFFFF",
+  playIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   currentStepContainer: {
     paddingHorizontal: 20,
@@ -910,19 +968,42 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#666666",
   },
+  videoActionButtons: {
+    flexDirection: "row",
+    gap: 12,
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
   shareToSocialButton: {
+    flex: 1,
+    backgroundColor: "#C9A962",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#C9A962",
-    marginHorizontal: 20,
-    marginVertical: 12,
-    paddingVertical: 14,
-    borderRadius: 12,
     gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
   },
   shareToSocialText: {
-    fontSize: 16,
+    fontSize: 15,
     color: "#1A1A1A",
+  },
+  saveToRollButton: {
+    flex: 1,
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: "#C9A962",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+  },
+  saveToRollText: {
+    fontSize: 15,
+    color: "#C9A962",
   },
 });

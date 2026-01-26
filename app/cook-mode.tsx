@@ -409,13 +409,13 @@ export default function CookModeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Background Image - Blurred and Subtle */}
+      {/* Background Image - Sharper for better visibility */}
       {stepImage && (
         <Image
           source={{ uri: stepImage }}
           style={styles.backgroundImage}
           contentFit="cover"
-          blurRadius={15}
+          blurRadius={5}
         />
       )}
       
@@ -661,7 +661,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    opacity: 0.6,
+    opacity: 0.7,
   },
   overlay: {
     position: "absolute",
@@ -669,7 +669,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    backgroundColor: "rgba(0, 0, 0, 0.35)",
   },
   content: {
     flex: 1,

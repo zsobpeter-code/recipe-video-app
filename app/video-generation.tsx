@@ -6,6 +6,7 @@ import {
   Platform,
   Animated,
   Easing,
+  TouchableOpacity,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import * as Haptics from "expo-haptics";
@@ -473,8 +474,26 @@ export default function VideoGenerationScreen() {
   const completedCount = stepVideos.filter(v => v.status === "completed").length;
   const failedCount = stepVideos.filter(v => v.status === "failed").length;
 
+  const handleCancel = () => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    router.back();
+  };
+
   return (
     <ScreenContainer className="bg-[#1A1A1A]">
+      {/* Header with Cancel Button */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.cancelButton}
+          onPress={handleCancel}
+          activeOpacity={0.7}
+        >
+          <IconSymbol name="xmark" size={20} color="#888888" />
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.container}>
         {/* Animated Icon */}
         <Animated.View 
@@ -572,6 +591,21 @@ export default function VideoGenerationScreen() {
 }
 
 const styles = StyleSheet.create({
+  header: {
+    flexDirection: "row",
+    justifyContent: "flex-start",
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
+  },
+  cancelButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   container: {
     flex: 1,
     alignItems: "center",
