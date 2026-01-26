@@ -255,6 +255,32 @@ export default function RecipeCardScreen() {
     router.back();
   };
 
+  const handleCookMode = () => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+    
+    // Navigate directly to video player in cook mode (free, no paywall)
+    const cookImageUri = generatedPhotoUri || displayImageUri;
+    
+    router.push({
+      pathname: "/video-player" as any,
+      params: {
+        dishName: params.dishName,
+        recipeData: JSON.stringify({
+          dishName: params.dishName,
+          description: params.description,
+          ingredients: params.ingredients,
+          steps: params.steps,
+          prepTime: params.prepTime,
+          cookTime: params.cookTime,
+        }),
+        imageUri: cookImageUri,
+        mode: "cook", // Cook mode = free step-by-step view
+      },
+    });
+  };
+
   const handleGenerateVideo = () => {
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -674,24 +700,30 @@ export default function RecipeCardScreen() {
         </View>
       </ScrollView>
 
-      {/* Bottom action buttons */}
+      {/* Bottom action buttons - 3 equal buttons */}
       <View style={[styles.bottomActions, { paddingBottom: insets.bottom + 16 }]}>
         <SecondaryButton
-          title={isSaved ? "Saved ✓" : "Save"}
+          title={isSaved ? "Saved" : "Save"}
           onPress={handleSaveToCollection}
           icon={isSaving ? (
             <ActivityIndicator size="small" color="#C9A962" />
           ) : (
-            <IconSymbol name="bookmark.fill" size={18} color="#C9A962" />
+            <IconSymbol name="bookmark.fill" size={16} color="#C9A962" />
           )}
           style={{ flex: 1, opacity: isSaving ? 0.7 : 1 }}
           disabled={isSaving}
         />
         <PrimaryButton
-          title="Generate Video · $1.99"
+          title="Cook"
+          onPress={handleCookMode}
+          icon={<IconSymbol name="frying.pan.fill" size={16} color="#1A1A1A" />}
+          style={{ flex: 1 }}
+        />
+        <SecondaryButton
+          title="Video"
           onPress={handleGenerateVideo}
-          icon={<IconSymbol name="video.fill" size={18} color="#1A1A1A" />}
-          style={{ flex: 2 }}
+          icon={<IconSymbol name="video.fill" size={16} color="#C9A962" />}
+          style={{ flex: 1 }}
         />
       </View>
     </View>

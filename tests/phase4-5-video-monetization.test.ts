@@ -171,7 +171,7 @@ describe("Phase 4 & 5: Video Generation & Monetization", () => {
       
       expect(content).toContain("currentStep");
       expect(content).toContain("instruction");
-      expect(content).toContain("CURRENT STEP");
+      expect(content).toContain("STEP");
     });
 
     it("should have steps list", () => {

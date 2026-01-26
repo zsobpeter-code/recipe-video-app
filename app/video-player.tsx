@@ -62,7 +62,11 @@ export default function VideoPlayerScreen() {
     recipeData?: string;
     imageUri?: string;
     enrichedSteps?: string; // JSON string of enriched visual prompts
+    mode?: string; // "cook" for free step-by-step, "video" for generated video
   }>();
+
+  // Determine if this is cook mode (free) or video mode (paid)
+  const isCookMode = params.mode === "cook";
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -367,7 +371,7 @@ export default function VideoPlayerScreen() {
           style={[styles.headerTitle, { fontFamily: "Inter-Medium" }]}
           numberOfLines={1}
         >
-          {params.dishName || "Cooking Tutorial"}
+          {isCookMode ? "Cook Mode" : (params.dishName || "Video Tutorial")}
         </Text>
         <TouchableOpacity 
           style={styles.headerButton}
@@ -458,14 +462,20 @@ export default function VideoPlayerScreen() {
 
       {/* Current Step Display */}
       <View style={styles.currentStepContainer}>
+        {/* Show dish name in cook mode */}
+        {isCookMode && params.dishName && (
+          <Text style={[styles.dishNameSubtitle, { fontFamily: "PlayfairDisplay-Bold" }]}>
+            {params.dishName}
+          </Text>
+        )}
         <Text style={[styles.currentStepLabel, { fontFamily: "Inter-Medium" }]}>
-          CURRENT STEP
+          STEP {currentStepIndex + 1} OF {steps.length}
         </Text>
-        <Text style={[styles.currentStepText, { fontFamily: "PlayfairDisplay-Bold" }]}>
+        <Text style={[styles.currentStepText, { fontFamily: "Inter" }]}>
           {currentStep?.instruction || "Loading..."}
         </Text>
-        {/* Show enriched visual prompt if available */}
-        {enrichedSteps[currentStepIndex]?.visualPrompt && (
+        {/* Show enriched visual prompt only in video mode */}
+        {!isCookMode && enrichedSteps[currentStepIndex]?.visualPrompt && (
           <View style={styles.visualPromptContainer}>
             <View style={styles.visualPromptHeader}>
               <IconSymbol name="video.fill" size={12} color="#C9A962" />
@@ -737,6 +747,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "#C9A962",
     letterSpacing: 1,
+  },
+  dishNameSubtitle: {
+    fontSize: 24,
+    color: "#FFFFFF",
+    marginBottom: 8,
   },
   currentStepText: {
     fontSize: 20,

@@ -89,11 +89,12 @@ describe("AI Integration Tests", () => {
       const screenPath = path.join(process.cwd(), "app/recipe-card.tsx");
       const content = fs.readFileSync(screenPath, "utf-8");
       
-      expect(content).toContain("Generate Video");
-      expect(content).toContain("$1.99");
+      expect(content).toContain("Video");
       expect(content).toContain("Save");
+      expect(content).toContain("Cook");
       expect(content).toContain("handleGenerateVideo");
       expect(content).toContain("handleSaveToCollection");
+      expect(content).toContain("handleCookMode");
     });
 
     it("should use glassmorphism card component", () => {

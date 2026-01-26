@@ -236,3 +236,18 @@
 ### Step 4: Integration Point
 - [x] Created generateAndStoreVideo placeholder for Runway API
 - [x] Service ready for Runway integration
+
+## Feature: Cook Mode (Free Step-by-Step Instructions)
+
+### UI Changes
+- [x] Add "Cook" button to recipe-card.tsx bottom bar
+- [x] Layout: [Save] [Cook] [Video] - 3 equal buttons
+- [x] Cook button: gold filled (PrimaryButton), Save/Video: outlined (SecondaryButton)
+
+### Cook Mode Screen
+- [x] Modified video-player.tsx to support cook mode via "mode" param
+- [x] Show step-by-step view without video/payment
+- [x] Include: step image, step text, prev/next nav, timer
+- [x] No paywall required - FREE to use
+- [x] Shows dish name subtitle in cook mode
+- [x] Hides scene description (video-only feature)

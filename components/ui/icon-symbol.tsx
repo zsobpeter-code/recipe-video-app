@@ -69,6 +69,10 @@ const MAPPING = {
   "forward.fill": "skip-next",
   "arrow.left": "arrow-back",
   "arrow.right": "arrow-forward",
+  
+  // Cook mode
+  "frying.pan.fill": "restaurant",
+  "timer": "timer",
 } as IconMapping;
 
 /**

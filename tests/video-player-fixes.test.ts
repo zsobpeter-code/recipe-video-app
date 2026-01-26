@@ -122,7 +122,7 @@ describe("Video Player Bug Fixes", () => {
     });
 
     it("should display current step instruction", () => {
-      expect(videoPlayerContent).toContain("CURRENT STEP");
+      expect(videoPlayerContent).toContain("STEP");
       expect(videoPlayerContent).toContain("currentStep?.instruction");
     });
 
