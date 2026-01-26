@@ -48,6 +48,7 @@ export default function VideoGenerationScreen() {
   // tRPC mutations
   const enrichForVideoMutation = trpc.recipe.enrichForVideo.useMutation();
   const generateStepVideoMutation = trpc.recipe.generateStepVideo.useMutation();
+  const updateStepVideosMutation = trpc.recipe.updateStepVideos.useMutation();
 
   // Animations
   const spinValue = useRef(new Animated.Value(0)).current;
@@ -340,6 +341,21 @@ export default function VideoGenerationScreen() {
         
         if (Platform.OS !== "web") {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+
+        // Save step videos to database if we have a recipe ID
+        const completedVideos = generatedVideos.filter(v => v.status === "completed" && v.videoUrl);
+        if (params.recipeId && completedVideos.length > 0) {
+          try {
+            await updateStepVideosMutation.mutateAsync({
+              recipeId: params.recipeId,
+              stepVideos: JSON.stringify(completedVideos),
+            });
+            console.log("[VideoGeneration] Saved", completedVideos.length, "step videos to database");
+          } catch (saveError) {
+            console.error("[VideoGeneration] Failed to save step videos:", saveError);
+            // Don't fail the whole flow if save fails
+          }
         }
 
         // Navigate to video player after short delay

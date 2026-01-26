@@ -60,6 +60,8 @@ export interface SavedRecipe {
   tags: string | null; // JSON string
   imageUrl: string | null; // AI-generated or main display image
   originalImageUrl: string | null; // Original captured/uploaded image (e.g., handwritten recipe)
+  stepImages: string | null; // JSON string of step images with HTTPS URLs
+  stepVideos: string | null; // JSON string of step videos with HTTPS URLs
   isFavorite: boolean;
   createdAt: string;
   updatedAt: string;
@@ -230,6 +232,8 @@ Always return your response as valid JSON matching this exact structure:
         tags: z.string().optional(), // JSON string
         imageUrl: z.string().optional(), // AI-generated or main display image
         originalImageUrl: z.string().optional(), // Original captured image (e.g., handwritten recipe)
+        stepImages: z.string().optional(), // JSON string of step images with HTTPS URLs
+        stepVideos: z.string().optional(), // JSON string of step videos with HTTPS URLs
       }))
       .mutation(async ({ input }) => {
         try {
@@ -252,6 +256,8 @@ Always return your response as valid JSON matching this exact structure:
             tags: input.tags || null,
             imageUrl: input.imageUrl || null,
             originalImageUrl: input.originalImageUrl || null,
+            stepImages: input.stepImages || null,
+            stepVideos: input.stepVideos || null,
             isFavorite: false,
             createdAt: now,
             updatedAt: now,
@@ -382,6 +388,62 @@ Always return your response as valid JSON matching this exact structure:
           return {
             success: false,
             error: error instanceof Error ? error.message : "Failed to delete recipe",
+          };
+        }
+      }),
+
+    // Update step images for a recipe
+    updateStepImages: publicProcedure
+      .input(z.object({
+        recipeId: z.string().describe("Recipe ID to update"),
+        stepImages: z.string().describe("JSON string of step images with HTTPS URLs"),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          const recipe = recipes.get(input.recipeId);
+          if (!recipe) {
+            return { success: false, error: "Recipe not found" };
+          }
+          
+          recipe.stepImages = input.stepImages;
+          recipe.updatedAt = new Date().toISOString();
+          recipes.set(input.recipeId, recipe);
+          
+          console.log(`[Recipe] Updated step images for ${input.recipeId}`);
+          return { success: true };
+        } catch (error) {
+          console.error("Update step images error:", error);
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to update step images",
+          };
+        }
+      }),
+
+    // Update step videos for a recipe
+    updateStepVideos: publicProcedure
+      .input(z.object({
+        recipeId: z.string().describe("Recipe ID to update"),
+        stepVideos: z.string().describe("JSON string of step videos with HTTPS URLs"),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          const recipe = recipes.get(input.recipeId);
+          if (!recipe) {
+            return { success: false, error: "Recipe not found" };
+          }
+          
+          recipe.stepVideos = input.stepVideos;
+          recipe.updatedAt = new Date().toISOString();
+          recipes.set(input.recipeId, recipe);
+          
+          console.log(`[Recipe] Updated step videos for ${input.recipeId}`);
+          return { success: true };
+        } catch (error) {
+          console.error("Update step videos error:", error);
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to update step videos",
           };
         }
       }),

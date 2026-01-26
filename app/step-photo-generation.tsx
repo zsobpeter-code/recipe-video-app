@@ -56,8 +56,9 @@ export default function StepPhotoGenerationScreen() {
   const progress = useSharedValue(0);
   const pulse = useSharedValue(1);
 
-  // tRPC mutation for generating step photos
+  // tRPC mutations
   const generatePhotosMutation = trpc.recipe.generateStepPhotos.useMutation();
+  const updateStepImagesMutation = trpc.recipe.updateStepImages.useMutation();
 
   // Parse steps from recipe data
   useEffect(() => {
@@ -106,6 +107,9 @@ export default function StepPhotoGenerationScreen() {
   }, []);
 
   const generateStepPhotos = async () => {
+    // Collect all generated images in a local array (not relying on state)
+    const allGeneratedImages: StepImage[] = [];
+    
     try {
       // Generate photos for all steps
       for (let i = 0; i < steps.length; i++) {
@@ -122,10 +126,12 @@ export default function StepPhotoGenerationScreen() {
         });
 
         if (result.success && result.imageUrl) {
-          setGeneratedImages(prev => [...prev, {
+          const newImage = {
             stepIndex: i,
             imageUrl: result.imageUrl!,
-          }]);
+          };
+          allGeneratedImages.push(newImage);
+          setGeneratedImages(prev => [...prev, newImage]);
           
           if (Platform.OS !== "web") {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -138,6 +144,20 @@ export default function StepPhotoGenerationScreen() {
       
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+
+      // Save step images to database if we have a recipe ID
+      if (params.recipeId && allGeneratedImages.length > 0) {
+        try {
+          await updateStepImagesMutation.mutateAsync({
+            recipeId: params.recipeId,
+            stepImages: JSON.stringify(allGeneratedImages),
+          });
+          console.log("[StepPhotoGeneration] Saved", allGeneratedImages.length, "step images to database");
+        } catch (saveError) {
+          console.error("[StepPhotoGeneration] Failed to save step images:", saveError);
+          // Don't fail the whole flow if save fails
+        }
       }
 
       // Don't auto-navigate - let user choose to view or save
