@@ -11,6 +11,7 @@ import {
   waitForVideo, 
   createCookingVideoPrompt,
   validateImageUrl,
+  generateVideoWithRetry,
   type VideoGenerationResult 
 } from "./runwayService";
 import { storagePut } from "./storage";
@@ -238,6 +239,7 @@ export async function generateStepVideos(
 
 /**
  * Generate a single step video and store it in Supabase
+ * Uses retry logic with exponential backoff for reliability
  */
 export async function generateSingleStepVideo(
   userId: string,
@@ -248,59 +250,44 @@ export async function generateSingleStepVideo(
   stepNumber: number
 ): Promise<{ videoUrl: string; status: string; error?: string }> {
   const prompt = createCookingVideoPrompt(stepInstruction, dishName, stepNumber);
+  const stepIndex = stepNumber - 1; // Convert to 0-indexed
   
   console.log(`[VideoStorage] Generating single video for step ${stepNumber}`);
   console.log(`[VideoStorage] Input imageUrl:`, imageUrl?.substring(0, 100));
   
   try {
-    // Validate the image URL before sending to Runway
-    let validatedUrl: string;
-    try {
-      validatedUrl = validateImageUrl(imageUrl);
-    } catch (urlError: any) {
-      console.error(`[VideoStorage] Invalid image URL:`, urlError.message);
+    // Use the new retry-enabled function
+    const tempVideoUrl = await generateVideoWithRetry(
+      imageUrl,
+      prompt,
+      stepIndex,
+      2, // max 2 retries
+      3 * 60 * 1000 // 3 minute timeout per attempt
+    );
+    
+    if (!tempVideoUrl) {
       return {
         videoUrl: "",
         status: "failed",
-        error: urlError.message || "Invalid image URL"
+        error: "Video generation failed after all retries"
       };
     }
     
-    console.log(`[VideoStorage] Validated imageUrl:`, validatedUrl?.substring(0, 100));
-    
-    const startResult = await generateVideoFromImage(validatedUrl, prompt, 5);
-    
-    if (startResult.status === "FAILED" || !startResult.taskId) {
-      return {
-        videoUrl: "",
-        status: "failed",
-        error: startResult.error || "Failed to start video generation"
-      };
-    }
-    
-    const result = await waitForVideo(startResult.taskId);
-    
-    if (result.status === "SUCCEEDED" && result.videoUrl) {
-      // Store permanently in Supabase
-      const permanentUrl = await storeVideoToSupabase(
-        result.videoUrl,
-        userId,
-        recipeId,
-        stepNumber - 1 // Convert to 0-indexed
-      );
-      
-      return {
-        videoUrl: permanentUrl,
-        status: "completed"
-      };
-    }
+    // Store permanently in Supabase
+    const permanentUrl = await storeVideoToSupabase(
+      tempVideoUrl,
+      userId,
+      recipeId,
+      stepIndex
+    );
     
     return {
-      videoUrl: "",
-      status: "failed",
-      error: result.error || "Video generation failed"
+      videoUrl: permanentUrl,
+      status: "completed"
     };
+    
   } catch (error: any) {
+    console.error(`[VideoStorage] Error in generateSingleStepVideo:`, error);
     return {
       videoUrl: "",
       status: "failed",

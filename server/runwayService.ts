@@ -214,6 +214,116 @@ export async function generateAndWaitForVideo(
 }
 
 /**
+ * Generate a video with retry logic
+ * Retries on failure with exponential backoff
+ * @param imageUrl - URL of the source image
+ * @param prompt - Text prompt for the video
+ * @param stepIndex - Step index for logging
+ * @param maxRetries - Maximum number of retry attempts (default: 2)
+ * @param timeoutMs - Timeout per attempt in milliseconds (default: 3 minutes)
+ * @returns Video URL or null if all retries failed
+ */
+export async function generateVideoWithRetry(
+  imageUrl: string,
+  prompt: string,
+  stepIndex: number,
+  maxRetries: number = 2,
+  timeoutMs: number = 3 * 60 * 1000
+): Promise<string | null> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[Runway] Step ${stepIndex + 1}, attempt ${attempt + 1}/${maxRetries + 1}`);
+      
+      // Validate image URL first
+      const validatedUrl = validateImageUrl(imageUrl);
+      
+      // Start the video generation
+      const task = await client.imageToVideo.create({
+        model: VIDEO_CONFIG.model,
+        promptImage: validatedUrl,
+        promptText: prompt,
+        duration: VIDEO_CONFIG.duration,
+        ratio: VIDEO_CONFIG.ratio,
+      }) as any;
+      
+      console.log(`[Runway] Step ${stepIndex + 1} task created: ${task.id}`);
+      
+      // Wait for completion with timeout
+      const result = await waitForVideoWithTimeout(task.id, timeoutMs);
+      
+      if (result) {
+        console.log(`[Runway] Step ${stepIndex + 1} video generated successfully`);
+        return result;
+      }
+      
+      // If result is null, it means timeout or failure - try again
+      console.warn(`[Runway] Step ${stepIndex + 1} attempt ${attempt + 1} returned no result`);
+      
+    } catch (error: any) {
+      console.error(`[Runway] Step ${stepIndex + 1} attempt ${attempt + 1} failed:`, error?.message || error);
+      
+      if (attempt < maxRetries) {
+        // Wait before retry with exponential backoff (5s, 10s, 20s...)
+        const delayMs = 5000 * Math.pow(2, attempt);
+        console.log(`[Runway] Retrying step ${stepIndex + 1} in ${delayMs / 1000}s...`);
+        await new Promise(r => setTimeout(r, delayMs));
+      }
+    }
+  }
+  
+  // Return null instead of throwing - allow other steps to continue
+  console.warn(`[Runway] Step ${stepIndex + 1} failed after ${maxRetries + 1} attempts, skipping`);
+  return null;
+}
+
+/**
+ * Wait for video generation with a specific timeout
+ * @param taskId - The task ID to wait for
+ * @param timeoutMs - Maximum time to wait in milliseconds
+ * @returns Video URL if successful, null if timeout or failure
+ */
+async function waitForVideoWithTimeout(
+  taskId: string,
+  timeoutMs: number
+): Promise<string | null> {
+  const startTime = Date.now();
+  const pollIntervalMs = 5000; // Poll every 5 seconds
+  
+  while (Date.now() - startTime < timeoutMs) {
+    try {
+      const task = await client.tasks.retrieve(taskId) as any;
+      
+      console.log(`[Runway] Task ${taskId} status: ${task.status}, progress: ${task.progress ?? "N/A"}`);
+      
+      if (task.status === "SUCCEEDED") {
+        const videoUrl = task.output?.[0];
+        if (videoUrl) {
+          return videoUrl;
+        }
+        console.warn(`[Runway] Task succeeded but no output URL found`);
+        return null;
+      }
+      
+      if (task.status === "FAILED" || task.status === "CANCELLED") {
+        console.error(`[Runway] Task ${taskId} failed: ${task.failure || "Unknown error"}`);
+        return null;
+      }
+      
+      // Wait before next poll
+      await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+      
+    } catch (error: any) {
+      console.error(`[Runway] Error polling task ${taskId}:`, error?.message || error);
+      // Don't return null immediately on poll error - might be transient
+      await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+    }
+  }
+  
+  console.warn(`[Runway] Task ${taskId} timed out after ${timeoutMs / 1000}s`);
+  return null;
+}
+
+/**
  * Generate cooking step video prompt from step instruction
  * Creates a cinematic prompt optimized for food/cooking videos
  */

@@ -467,3 +467,18 @@
 - [ ] Test: Cook Mode background images load from Supabase URLs
 - [ ] Test: After app restart, step images still visible
 - [ ] Test: Video generation works with the HTTPS URLs
+
+
+## Bug Fix - Video Generation tRPC Timeout Error
+
+### Problem
+- Step 8 video failed with: TRPCClientError: Unable to transform response from server
+- Likely a timeout or response parsing issue when Runway takes too long
+
+### Solution
+- [x] Add retry logic to runwayService.ts (max 2 retries per step)
+- [x] Add configurable timeout for video generation (3 min default)
+- [x] Return null instead of throwing on failure - allow other steps to continue
+- [x] Add exponential backoff between retries (5s, 10s, 20s...)
+- [x] Log retry attempts for debugging
+- [x] Update generateSingleStepVideo to use new generateVideoWithRetry function
