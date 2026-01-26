@@ -7,6 +7,7 @@ const client = new RunwayML({
 
 // Video generation configuration
 const VIDEO_CONFIG = {
+
   model: "gen3a_turbo" as const,
   duration: 5 as const, // 5 seconds per step
   ratio: "768:1280" as const, // Vertical portrait mode
@@ -29,8 +30,47 @@ export interface VideoTaskStatus {
 }
 
 /**
+ * Validate and normalize image URL for Runway API
+ * Runway requires HTTPS URLs, runway:// URIs, or data:image/ base64
+ */
+export function validateImageUrl(imageUrl: string | undefined | null): string {
+  console.log("[Runway] Validating image URL:", imageUrl?.substring(0, 100));
+  
+  if (!imageUrl) {
+    throw new Error("No image URL provided for video generation");
+  }
+  
+  // Already valid HTTPS URL
+  if (imageUrl.startsWith("https://")) {
+    console.log("[Runway] Valid HTTPS URL");
+    return imageUrl;
+  }
+  
+  // Runway upload URI
+  if (imageUrl.startsWith("runway://")) {
+    console.log("[Runway] Valid Runway URI");
+    return imageUrl;
+  }
+  
+  // Base64 data URI
+  if (imageUrl.startsWith("data:image/")) {
+    console.log("[Runway] Valid base64 data URI");
+    return imageUrl;
+  }
+  
+  // Try to convert HTTP to HTTPS
+  if (imageUrl.startsWith("http://")) {
+    console.log("[Runway] Converting HTTP to HTTPS");
+    return imageUrl.replace("http://", "https://");
+  }
+  
+  // Invalid URL format
+  throw new Error(`Invalid image URL format. Must start with https://, runway://, or data:image/. Got: ${imageUrl.substring(0, 50)}...`);
+}
+
+/**
  * Generate a video from an image using Runway Gen-3 API
- * @param imageUrl - URL of the source image
+ * @param imageUrl - URL of the source image (must be HTTPS, runway://, or data:image/)
  * @param prompt - Text prompt describing the desired motion/action
  * @param duration - Video duration in seconds (5 or 10)
  * @returns Task ID for tracking the generation
@@ -41,11 +81,17 @@ export async function generateVideoFromImage(
   duration: 5 | 10 = VIDEO_CONFIG.duration
 ): Promise<VideoGenerationResult> {
   try {
-    console.log("[Runway] Starting video generation:", { imageUrl: imageUrl.substring(0, 50) + "...", prompt: prompt.substring(0, 100) + "..." });
+    // Validate and normalize the image URL
+    const validatedUrl = validateImageUrl(imageUrl);
+    
+    console.log("[Runway] Starting video generation:", { 
+      imageUrl: validatedUrl.substring(0, 80) + "...", 
+      prompt: prompt.substring(0, 100) + "..." 
+    });
     
     const task = await client.imageToVideo.create({
       model: VIDEO_CONFIG.model,
-      promptImage: imageUrl,
+      promptImage: validatedUrl,
       promptText: prompt,
       duration: duration,
       ratio: VIDEO_CONFIG.ratio,

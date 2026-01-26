@@ -404,3 +404,16 @@
 - [x] Handle steps as both array and JSON string
 - [x] Guard against undefined/empty steps with error logging
 - [x] Use Array.isArray check before accessing steps.length
+
+## Bug Fix - Runway API Invalid Image URL
+
+### Problem
+- Runway API returns 400 error: "Invalid string: must start with https://"
+- promptImage parameter receiving undefined, base64, or file path instead of HTTPS URL
+
+### Fixes Needed
+- [x] Add URL validation in runwayService.ts before calling Runway API
+- [x] Add debug logging to trace image URL values
+- [x] Add fallback to main recipe image if step images unavailable
+- [x] Convert HTTP to HTTPS if needed
+- [x] Throw clear error if no valid HTTPS URL found

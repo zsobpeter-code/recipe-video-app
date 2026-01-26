@@ -10,6 +10,7 @@ import {
   generateVideoFromImage, 
   waitForVideo, 
   createCookingVideoPrompt,
+  validateImageUrl,
   type VideoGenerationResult 
 } from "./runwayService";
 import { storagePut } from "./storage";
@@ -129,6 +130,19 @@ export async function generateStepVideos(
   
   const stepVideos: StepVideo[] = [];
   
+  // Validate the image URL before starting
+  let validatedImageUrl: string;
+  try {
+    validatedImageUrl = validateImageUrl(imageUrl);
+    console.log(`[VideoStorage] Validated imageUrl for batch:`, validatedImageUrl?.substring(0, 100));
+  } catch (urlError: any) {
+    console.error(`[VideoStorage] Invalid image URL for batch:`, urlError.message);
+    progress.status = "failed";
+    progress.error = urlError.message;
+    onProgress?.(progress);
+    return [];
+  }
+  
   // Generate video for each step sequentially
   // (Runway has rate limits, so we process one at a time)
   for (let i = 0; i < steps.length; i++) {
@@ -149,7 +163,7 @@ export async function generateStepVideos(
       );
       
       // Start video generation
-      const startResult = await generateVideoFromImage(imageUrl, prompt, 5);
+      const startResult = await generateVideoFromImage(validatedImageUrl, prompt, 5);
       
       if (startResult.status === "FAILED" || !startResult.taskId) {
         throw new Error(startResult.error || "Failed to start video generation");
@@ -236,9 +250,25 @@ export async function generateSingleStepVideo(
   const prompt = createCookingVideoPrompt(stepInstruction, dishName, stepNumber);
   
   console.log(`[VideoStorage] Generating single video for step ${stepNumber}`);
+  console.log(`[VideoStorage] Input imageUrl:`, imageUrl?.substring(0, 100));
   
   try {
-    const startResult = await generateVideoFromImage(imageUrl, prompt, 5);
+    // Validate the image URL before sending to Runway
+    let validatedUrl: string;
+    try {
+      validatedUrl = validateImageUrl(imageUrl);
+    } catch (urlError: any) {
+      console.error(`[VideoStorage] Invalid image URL:`, urlError.message);
+      return {
+        videoUrl: "",
+        status: "failed",
+        error: urlError.message || "Invalid image URL"
+      };
+    }
+    
+    console.log(`[VideoStorage] Validated imageUrl:`, validatedUrl?.substring(0, 100));
+    
+    const startResult = await generateVideoFromImage(validatedUrl, prompt, 5);
     
     if (startResult.status === "FAILED" || !startResult.taskId) {
       return {
