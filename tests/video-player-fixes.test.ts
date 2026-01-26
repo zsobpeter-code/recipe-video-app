@@ -15,20 +15,21 @@ describe("Video Player Bug Fixes", () => {
   });
 
   describe("BUG 1: Step-specific visuals", () => {
-    it("should have STEP_VISUALS array for different step animations", () => {
-      expect(videoPlayerContent).toContain("STEP_VISUALS");
+    it("should have step-specific animations for different steps", () => {
+      // New video player uses inline visual array instead of STEP_VISUALS constant
       expect(videoPlayerContent).toContain("scale:");
       expect(videoPlayerContent).toContain("translateX:");
       expect(videoPlayerContent).toContain("translateY:");
     });
 
     it("should use currentStepIndex to select visual style", () => {
-      expect(videoPlayerContent).toContain("currentStepIndex % STEP_VISUALS.length");
+      expect(videoPlayerContent).toContain("currentStepIndex % 5");
     });
 
     it("should have step-specific color overlay", () => {
-      expect(videoPlayerContent).toContain("stepOverlay");
-      expect(videoPlayerContent).toContain("overlayOpacity");
+      // New video player uses gradient overlay instead of animated overlay
+      expect(videoPlayerContent).toContain("gradient");
+      expect(videoPlayerContent).toContain("LinearGradient");
     });
   });
 
@@ -38,7 +39,7 @@ describe("Video Player Bug Fixes", () => {
     });
 
     it("should have only one play/pause button in navigation controls", () => {
-      expect(videoPlayerContent).toContain("playPauseButton");
+      expect(videoPlayerContent).toContain("playButton");
       // The video container should be touchable for play/pause
       expect(videoPlayerContent).toContain("TouchableOpacity");
       expect(videoPlayerContent).toContain("onPress={handlePlayPause}");
@@ -46,14 +47,14 @@ describe("Video Player Bug Fixes", () => {
 
     it("should have tap to play hint when paused", () => {
       expect(videoPlayerContent).toContain("Tap to play");
-      expect(videoPlayerContent).toContain("pausedIndicator");
+      expect(videoPlayerContent).toContain("tapHint");
     });
   });
 
   describe("BUG 3: Scrollable steps section", () => {
     it("should have ScrollView for steps list", () => {
       expect(videoPlayerContent).toContain("ScrollView");
-      expect(videoPlayerContent).toContain("stepsScrollRef");
+      expect(videoPlayerContent).toContain("stepsScroll");
     });
 
     it("should have nestedScrollEnabled for proper scrolling", () => {
@@ -61,7 +62,7 @@ describe("Video Player Bug Fixes", () => {
     });
 
     it("should have proper padding for safe area", () => {
-      expect(videoPlayerContent).toContain("paddingBottom: insets.bottom");
+      expect(videoPlayerContent).toContain("insets.bottom");
     });
   });
 
@@ -78,13 +79,13 @@ describe("Video Player Bug Fixes", () => {
 
     it("should share recipe name, step count, and total time", () => {
       expect(videoPlayerContent).toContain("dishName");
-      expect(videoPlayerContent).toContain("totalSteps");
+      expect(videoPlayerContent).toContain("steps.length");
       expect(videoPlayerContent).toContain("totalMins");
     });
 
     it("should handle share errors gracefully", () => {
-      expect(videoPlayerContent).toContain("Share Failed");
-      expect(videoPlayerContent).toContain("Alert.alert");
+      expect(videoPlayerContent).toContain("Share error");
+      expect(videoPlayerContent).toContain("console.error");
     });
   });
 
@@ -127,8 +128,9 @@ describe("Video Player Bug Fixes", () => {
     });
 
     it("should have progress bar", () => {
-      expect(videoPlayerContent).toContain("progressBarContainer");
-      expect(videoPlayerContent).toContain("progressPercent");
+      expect(videoPlayerContent).toContain("progressContainer");
+      expect(videoPlayerContent).toContain("progressBar");
+      expect(videoPlayerContent).toContain("progressFill");
     });
   });
 });

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { 
   View, 
   Text, 
@@ -9,9 +9,11 @@ import {
   Dimensions,
   Share,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Image } from "expo-image";
+import { useVideoPlayer, VideoView } from "expo-video";
 import * as Haptics from "expo-haptics";
 import Animated, {
   useSharedValue,
@@ -36,16 +38,14 @@ interface RecipeStep {
   instruction: string;
   duration: string;
   durationSeconds: number;
+  videoUrl?: string;
 }
 
-// Step-specific visual styles for variety
-const STEP_VISUALS = [
-  { scale: [1, 1.15], translateX: [0, 15], translateY: [0, 10], overlay: "rgba(201,169,98,0.1)" },
-  { scale: [1.05, 1.2], translateX: [-10, 10], translateY: [5, -5], overlay: "rgba(139,90,43,0.15)" },
-  { scale: [1, 1.1], translateX: [10, -10], translateY: [-5, 5], overlay: "rgba(201,169,98,0.08)" },
-  { scale: [1.08, 1.18], translateX: [5, -15], translateY: [10, 0], overlay: "rgba(168,139,74,0.12)" },
-  { scale: [1.02, 1.12], translateX: [-5, 5], translateY: [0, 8], overlay: "rgba(201,169,98,0.05)" },
-];
+interface StepVideo {
+  stepIndex: number;
+  videoUrl: string;
+  status: string;
+}
 
 interface EnrichedStep {
   stepNumber: number;
@@ -61,174 +61,190 @@ export default function VideoPlayerScreen() {
     dishName?: string;
     recipeData?: string;
     imageUri?: string;
-    enrichedSteps?: string; // JSON string of enriched visual prompts
-    mode?: string; // "cook" for free step-by-step, "video" for generated video
+    enrichedSteps?: string;
+    stepVideos?: string; // JSON string of step videos from Runway
+    mode?: string;
   }>();
 
-  // Determine if this is cook mode (free) or video mode (paid)
   const isCookMode = params.mode === "cook";
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [steps, setSteps] = useState<RecipeStep[]>([]);
+  const [stepVideos, setStepVideos] = useState<StepVideo[]>([]);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [enrichedSteps, setEnrichedSteps] = useState<EnrichedStep[]>([]);
+  const [isVideoLoading, setIsVideoLoading] = useState(false);
   
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stepsScrollRef = useRef<ScrollView>(null);
 
-  // Ken Burns animation values
+  // Get current step video URL
+  const currentStepVideo = stepVideos.find(v => v.stepIndex === currentStepIndex);
+  const hasRealVideo = currentStepVideo?.videoUrl && currentStepVideo.status === "completed";
+
+  // Create video player for current step
+  const player = useVideoPlayer(hasRealVideo ? currentStepVideo.videoUrl : null, (player) => {
+    player.loop = false;
+    player.muted = false;
+  });
+
+  // Ken Burns animation values (fallback when no real video)
   const scale = useSharedValue(1);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const overlayOpacity = useSharedValue(0);
-
-  // Parse enriched steps if available
-  useEffect(() => {
-    if (params.enrichedSteps) {
-      try {
-        const parsed = JSON.parse(params.enrichedSteps) as EnrichedStep[];
-        setEnrichedSteps(parsed);
-        console.log("Loaded enriched video prompts:", parsed.length, "steps");
-      } catch (error) {
-        console.error("Failed to parse enriched steps:", error);
-      }
-    }
-  }, [params.enrichedSteps]);
 
   // Parse recipe data
   useEffect(() => {
     if (params.recipeData) {
       try {
         const data = JSON.parse(params.recipeData);
-        const rawSteps = data.steps ? (typeof data.steps === 'string' ? JSON.parse(data.steps) : data.steps) : [];
-        const parsedSteps: RecipeStep[] = rawSteps.map(
-          (step: string | { stepNumber?: number; instruction: string; duration?: number }, index: number) => {
-            // Handle both string steps and object steps
-            const durationSecs = typeof step === 'object' && step.duration 
-              ? step.duration 
-              : Math.floor(Math.random() * 120) + 30; // 30-150 seconds
-            
-            const mins = Math.floor(durationSecs / 60);
-            const secs = durationSecs % 60;
-            
-            if (typeof step === 'string') {
-              return {
-                number: index + 1,
-                instruction: step,
-                duration: `${mins}:${String(secs).padStart(2, "0")}`,
-                durationSeconds: durationSecs,
-              };
-            }
+        if (data.steps && Array.isArray(data.steps)) {
+          const parsedSteps = data.steps.map((step: any, index: number) => {
+            const instruction = typeof step === "string" ? step : step.instruction;
+            const duration = typeof step === "object" ? step.duration : 2;
             return {
-              number: step.stepNumber || index + 1,
-              instruction: typeof step.instruction === 'string' ? step.instruction : String(step.instruction || ''),
-              duration: `${mins}:${String(secs).padStart(2, "0")}`,
-              durationSeconds: durationSecs,
+              number: index + 1,
+              instruction: instruction || `Step ${index + 1}`,
+              duration: duration ? `${duration} min` : "2 min",
+              durationSeconds: (duration || 2) * 60,
             };
-          }
-        );
-        if (parsedSteps.length > 0) {
+          });
           setSteps(parsedSteps);
-        } else {
-          throw new Error("No steps found");
         }
-      } catch (error) {
-        // Fallback mock steps
-        setSteps([
-          { number: 1, instruction: "Gather all ingredients and prep your workspace", duration: "0:30", durationSeconds: 30 },
-          { number: 2, instruction: "Heat the pan over medium heat with oil", duration: "1:00", durationSeconds: 60 },
-          { number: 3, instruction: "Add the main ingredients and cook until golden", duration: "3:00", durationSeconds: 180 },
-          { number: 4, instruction: "Season with salt, pepper, and herbs", duration: "0:45", durationSeconds: 45 },
-          { number: 5, instruction: "Plate and garnish before serving", duration: "1:15", durationSeconds: 75 },
-        ]);
+      } catch (e) {
+        console.error("Failed to parse recipe data:", e);
       }
-    } else {
-      // Mock steps if no data
-      setSteps([
-        { number: 1, instruction: "Gather all ingredients and prep your workspace", duration: "0:30", durationSeconds: 30 },
-        { number: 2, instruction: "Heat the pan over medium heat with oil", duration: "1:00", durationSeconds: 60 },
-        { number: 3, instruction: "Add the main ingredients and cook until golden", duration: "3:00", durationSeconds: 180 },
-        { number: 4, instruction: "Season with salt, pepper, and herbs", duration: "0:45", durationSeconds: 45 },
-        { number: 5, instruction: "Plate and garnish before serving", duration: "1:15", durationSeconds: 75 },
-      ]);
     }
-  }, [params.recipeData]);
+    
+    // Parse enriched steps
+    if (params.enrichedSteps) {
+      try {
+        const enriched = JSON.parse(params.enrichedSteps);
+        if (Array.isArray(enriched)) {
+          setEnrichedSteps(enriched);
+        }
+      } catch (e) {
+        console.error("Failed to parse enriched steps:", e);
+      }
+    }
+    
+    // Parse step videos
+    if (params.stepVideos) {
+      try {
+        const videos = JSON.parse(params.stepVideos);
+        if (Array.isArray(videos)) {
+          setStepVideos(videos);
+        }
+      } catch (e) {
+        console.error("Failed to parse step videos:", e);
+      }
+    }
+  }, [params.recipeData, params.enrichedSteps, params.stepVideos]);
 
-  // Get visual style for current step (cycles through available styles)
-  const currentVisual = STEP_VISUALS[currentStepIndex % STEP_VISUALS.length];
-
-  // Ken Burns effect - different animation per step
+  // Handle video player events
   useEffect(() => {
-    if (isPlaying) {
-      const duration = 6000; // 6 seconds per cycle
-      const visual = STEP_VISUALS[currentStepIndex % STEP_VISUALS.length];
-      
-      // Zoom animation specific to this step
-      scale.value = withRepeat(
-        withSequence(
-          withTiming(visual.scale[1], { duration, easing: Easing.inOut(Easing.ease) }),
-          withTiming(visual.scale[0], { duration, easing: Easing.inOut(Easing.ease) })
-        ),
-        -1,
-        true
-      );
-      
-      // Pan horizontally - different per step
-      translateX.value = withRepeat(
-        withSequence(
-          withTiming(visual.translateX[1], { duration, easing: Easing.inOut(Easing.ease) }),
-          withTiming(visual.translateX[0], { duration, easing: Easing.inOut(Easing.ease) })
-        ),
-        -1,
-        true
-      );
-      
-      // Pan vertically - different per step
-      translateY.value = withRepeat(
-        withSequence(
-          withTiming(visual.translateY[1], { duration, easing: Easing.inOut(Easing.ease) }),
-          withTiming(visual.translateY[0], { duration, easing: Easing.inOut(Easing.ease) })
-        ),
-        -1,
-        true
-      );
+    if (!player) return;
 
-      // Pulse overlay opacity
-      overlayOpacity.value = withRepeat(
-        withSequence(
-          withTiming(0.3, { duration: duration / 2, easing: Easing.inOut(Easing.ease) }),
-          withTiming(0, { duration: duration / 2, easing: Easing.inOut(Easing.ease) })
-        ),
-        -1,
-        true
-      );
-    } else {
-      // Reset to initial state when paused
+    const subscription = player.addListener("playingChange", (event) => {
+      if (event.isPlaying !== isPlaying) {
+        setIsPlaying(event.isPlaying);
+      }
+    });
+
+    const statusSubscription = player.addListener("statusChange", (event) => {
+      if (event.status === "loading") {
+        setIsVideoLoading(true);
+      } else {
+        setIsVideoLoading(false);
+      }
+      
+      // Auto-advance when video ends
+      if (event.status === "idle" && isPlaying) {
+        if (currentStepIndex < steps.length - 1) {
+          setCurrentStepIndex(prev => prev + 1);
+        } else {
+          setIsPlaying(false);
+        }
+      }
+    });
+
+    return () => {
+      subscription.remove();
+      statusSubscription.remove();
+    };
+  }, [player, isPlaying, currentStepIndex, steps.length]);
+
+  // Ken Burns animation (fallback for steps without video)
+  useEffect(() => {
+    if (hasRealVideo) {
+      // Reset animations when using real video
       cancelAnimation(scale);
       cancelAnimation(translateX);
       cancelAnimation(translateY);
-      cancelAnimation(overlayOpacity);
+      scale.value = 1;
+      translateX.value = 0;
+      translateY.value = 0;
+      return;
+    }
+
+    if (isPlaying) {
+      const duration = 8000;
+      const stepVisualIndex = currentStepIndex % 5;
+      const visual = [
+        { scale: [1, 1.15], translateX: [0, 15], translateY: [0, 10] },
+        { scale: [1.05, 1.2], translateX: [-10, 10], translateY: [5, -5] },
+        { scale: [1, 1.1], translateX: [10, -10], translateY: [-5, 5] },
+        { scale: [1.08, 1.18], translateX: [5, -15], translateY: [10, 0] },
+        { scale: [1.02, 1.12], translateX: [-5, 5], translateY: [0, 8] },
+      ][stepVisualIndex];
+
+      scale.value = withRepeat(
+        withSequence(
+          withTiming(visual.scale[1], { duration: duration / 2, easing: Easing.inOut(Easing.ease) }),
+          withTiming(visual.scale[0], { duration: duration / 2, easing: Easing.inOut(Easing.ease) })
+        ),
+        -1,
+        true
+      );
+      translateX.value = withRepeat(
+        withSequence(
+          withTiming(visual.translateX[1], { duration: duration / 2, easing: Easing.inOut(Easing.ease) }),
+          withTiming(visual.translateX[0], { duration: duration / 2, easing: Easing.inOut(Easing.ease) })
+        ),
+        -1,
+        true
+      );
+      translateY.value = withRepeat(
+        withSequence(
+          withTiming(visual.translateY[1], { duration: duration / 2, easing: Easing.inOut(Easing.ease) }),
+          withTiming(visual.translateY[0], { duration: duration / 2, easing: Easing.inOut(Easing.ease) })
+        ),
+        -1,
+        true
+      );
+    } else {
+      cancelAnimation(scale);
+      cancelAnimation(translateX);
+      cancelAnimation(translateY);
       scale.value = withTiming(1, { duration: 300 });
       translateX.value = withTiming(0, { duration: 300 });
       translateY.value = withTiming(0, { duration: 300 });
-      overlayOpacity.value = withTiming(0, { duration: 300 });
     }
-  }, [isPlaying, currentStepIndex]);
+  }, [isPlaying, currentStepIndex, hasRealVideo]);
 
-  // Timer effect
+  // Timer effect (for steps without video)
   useEffect(() => {
-    if (isPlaying && steps.length > 0) {
+    if (!hasRealVideo && isPlaying && steps.length > 0) {
       timerRef.current = setInterval(() => {
         setElapsedTime(prev => {
           const currentStep = steps[currentStepIndex];
           if (prev >= currentStep.durationSeconds) {
-            // Auto-advance to next step
             if (currentStepIndex < steps.length - 1) {
               setCurrentStepIndex(idx => idx + 1);
               return 0;
             } else {
-              // End of all steps
               setIsPlaying(false);
               return prev;
             }
@@ -248,11 +264,17 @@ export default function VideoPlayerScreen() {
         clearInterval(timerRef.current);
       }
     };
-  }, [isPlaying, currentStepIndex, steps]);
+  }, [isPlaying, currentStepIndex, steps, hasRealVideo]);
 
   // Reset timer when step changes
   useEffect(() => {
     setElapsedTime(0);
+    
+    // Play video for new step if available
+    if (hasRealVideo && player) {
+      player.play();
+      setIsPlaying(true);
+    }
   }, [currentStepIndex]);
 
   const kenBurnsStyle = useAnimatedStyle(() => ({
@@ -263,20 +285,15 @@ export default function VideoPlayerScreen() {
     ],
   }));
 
-  const overlayStyle = useAnimatedStyle(() => ({
-    opacity: overlayOpacity.value,
-  }));
-
   const currentStep = steps[currentStepIndex];
+  const currentEnriched = enrichedSteps.find(e => e.stepNumber === currentStepIndex + 1);
   
-  // Format elapsed time
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${String(secs).padStart(2, "0")}`;
   };
 
-  // Calculate progress percentage
   const progressPercent = currentStep 
     ? Math.min((elapsedTime / currentStep.durationSeconds) * 100, 100) 
     : 0;
@@ -284,6 +301,14 @@ export default function VideoPlayerScreen() {
   const handlePlayPause = () => {
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    
+    if (hasRealVideo && player) {
+      if (isPlaying) {
+        player.pause();
+      } else {
+        player.play();
+      }
     }
     setIsPlaying(!isPlaying);
   };
@@ -306,18 +331,10 @@ export default function VideoPlayerScreen() {
     }
   };
 
-  const handleStepPress = (index: number) => {
-    if (Platform.OS !== "web") {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-    setCurrentStepIndex(index);
-  };
-
   const handleClose = () => {
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    setIsPlaying(false);
     router.back();
   };
 
@@ -327,37 +344,27 @@ export default function VideoPlayerScreen() {
     }
     
     try {
-      const dishName = params.dishName || "Delicious Recipe";
-      const totalSteps = steps.length;
-      const totalTime = steps.reduce((acc, step) => acc + step.durationSeconds, 0);
-      const totalMins = Math.floor(totalTime / 60);
+      const totalTime = steps.reduce((sum, s) => sum + s.durationSeconds, 0);
+      const totalMins = Math.ceil(totalTime / 60);
       
-      const message = `🍳 Check out this recipe for ${dishName}!\n\n` +
-        `📝 ${totalSteps} easy steps\n` +
-        `⏱️ Total time: ${totalMins} minutes\n\n` +
-        `Made with Recipe Studio`;
-      
-      const result = await Share.share({
-        message,
-        title: `${dishName} Recipe`,
+      await Share.share({
+        message: `Check out this recipe video for ${params.dishName || "a delicious dish"}! ${steps.length} steps, ${totalMins} minutes total cooking time.`,
+        title: params.dishName || "Recipe Video",
       });
-      
-      if (result.action === Share.sharedAction) {
-        if (Platform.OS !== "web") {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        }
-      }
     } catch (error) {
       console.error("Share error:", error);
-      Alert.alert("Share Failed", "Unable to share recipe. Please try again.");
     }
   };
 
+  const handleStepPress = (index: number) => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    setCurrentStepIndex(index);
+  };
+
   return (
-    <ScreenContainer 
-      edges={["top", "left", "right"]} 
-      containerClassName="bg-background"
-    >
+    <ScreenContainer edges={["top", "left", "right"]} containerClassName="bg-[#1A1A1A]">
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
@@ -371,235 +378,219 @@ export default function VideoPlayerScreen() {
           style={[styles.headerTitle, { fontFamily: "Inter-Medium" }]}
           numberOfLines={1}
         >
-          {isCookMode ? "Cook Mode" : (params.dishName || "Video Tutorial")}
+          {isCookMode ? "Cook Mode" : "Video Tutorial"}
         </Text>
         <TouchableOpacity 
           style={styles.headerButton}
           onPress={handleShare}
           activeOpacity={0.7}
         >
-          <IconSymbol name="paperplane.fill" size={22} color="#FFFFFF" />
+          <IconSymbol name="paperplane.fill" size={20} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
 
-      {/* Video Preview Area with Ken Burns Effect - NO play button overlay */}
-      <TouchableOpacity 
-        style={styles.videoContainer}
-        onPress={handlePlayPause}
-        activeOpacity={1}
-      >
-        <View style={styles.videoWrapper}>
-          {params.imageUri ? (
-            <>
-              <Animated.View style={[styles.kenBurnsContainer, kenBurnsStyle]}>
-                <Image
-                  source={{ uri: params.imageUri }}
-                  style={styles.videoPreview}
-                  contentFit="cover"
-                />
-              </Animated.View>
-              {/* Step-specific color overlay for visual variety */}
-              <Animated.View 
-                style={[
-                  styles.stepOverlay, 
-                  overlayStyle,
-                  { backgroundColor: currentVisual.overlay }
-                ]} 
+      {/* Video/Image Container */}
+      <View style={styles.videoContainer}>
+        {hasRealVideo ? (
+          // Real video playback
+          <View style={styles.videoWrapper}>
+            <VideoView
+              player={player}
+              style={styles.video}
+              contentFit="cover"
+              nativeControls={false}
+            />
+            {isVideoLoading && (
+              <View style={styles.loadingOverlay}>
+                <ActivityIndicator size="large" color="#C9A962" />
+              </View>
+            )}
+          </View>
+        ) : (
+          // Fallback: Ken Burns image animation
+          <Animated.View style={[styles.imageWrapper, kenBurnsStyle]}>
+            {params.imageUri ? (
+              <Image
+                source={{ uri: params.imageUri }}
+                style={styles.stepImage}
+                contentFit="cover"
               />
-            </>
-          ) : (
-            <View style={styles.videoPlaceholder}>
-              <IconSymbol name="video.fill" size={48} color="#555555" />
-              <Text style={[styles.placeholderText, { fontFamily: "Inter" }]}>
-                Video Preview
-              </Text>
-            </View>
-          )}
+            ) : (
+              <View style={styles.imagePlaceholder}>
+                <IconSymbol name="photo" size={48} color="#555555" />
+              </View>
+            )}
+          </Animated.View>
+        )}
+        
+        {/* Gradient overlay */}
+        <LinearGradient
+          colors={["transparent", "rgba(26, 26, 26, 0.8)", "#1A1A1A"]}
+          style={styles.gradient}
+        />
+        
+        {/* Step badge */}
+        <View style={styles.stepBadge}>
+          <Text style={[styles.stepBadgeText, { fontFamily: "Inter-Medium" }]}>
+            {hasRealVideo ? "AI VIDEO" : "STEP"} {currentStepIndex + 1}/{steps.length}
+          </Text>
         </View>
         
-        {/* Video Overlay - Step indicator and timer only */}
-        <View style={styles.videoOverlay}>
-          {/* Step indicator */}
-          <View style={styles.stepBadge}>
-            <Text style={[styles.stepBadgeText, { fontFamily: "Inter-Medium" }]}>
-              Step {currentStepIndex + 1} of {steps.length}
-            </Text>
-          </View>
-
-          {/* Timer */}
-          <View style={styles.timerBadge}>
-            <IconSymbol name="clock.fill" size={14} color="#FFFFFF" />
-            <Text style={[styles.timerText, { fontFamily: "Inter-Medium" }]}>
-              {formatTime(elapsedTime)} / {currentStep?.duration || "0:00"}
-            </Text>
-          </View>
-        </View>
-
-        {/* Progress bar */}
-        <View style={styles.progressBarContainer}>
-          <View style={[styles.progressBar, { width: `${progressPercent}%` }]} />
-        </View>
-
-        {/* Playing indicator */}
-        {isPlaying && (
-          <View style={styles.playingIndicator}>
-            <View style={styles.playingDot} />
-            <Text style={[styles.playingText, { fontFamily: "Inter-Medium" }]}>
-              PLAYING
-            </Text>
-          </View>
-        )}
-
-        {/* Paused indicator - subtle tap hint */}
+        {/* Tap hint */}
         {!isPlaying && (
-          <View style={styles.pausedIndicator}>
-            <Text style={[styles.pausedText, { fontFamily: "Inter" }]}>
+          <TouchableOpacity 
+            style={styles.tapHint}
+            onPress={handlePlayPause}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.tapHintText, { fontFamily: "Inter" }]}>
               Tap to play
             </Text>
-          </View>
+          </TouchableOpacity>
         )}
-      </TouchableOpacity>
+      </View>
 
-      {/* Current Step Display */}
+      {/* Current Step Info */}
       <View style={styles.currentStepContainer}>
-        {/* Show dish name in cook mode */}
-        {isCookMode && params.dishName && (
-          <Text style={[styles.dishNameSubtitle, { fontFamily: "PlayfairDisplay-Bold" }]}>
-            {params.dishName}
-          </Text>
-        )}
         <Text style={[styles.currentStepLabel, { fontFamily: "Inter-Medium" }]}>
           STEP {currentStepIndex + 1} OF {steps.length}
         </Text>
+        {isCookMode && (
+          <Text style={[styles.dishNameSubtitle, { fontFamily: "PlayfairDisplay-Bold" }]}>
+            {params.dishName || "Recipe"}
+          </Text>
+        )}
         <Text style={[styles.currentStepText, { fontFamily: "Inter" }]}>
           {currentStep?.instruction || "Loading..."}
         </Text>
-        {/* Show enriched visual prompt only in video mode */}
-        {!isCookMode && enrichedSteps[currentStepIndex]?.visualPrompt && (
+        
+        {/* Visual prompt (for video mode) */}
+        {!isCookMode && currentEnriched && (
           <View style={styles.visualPromptContainer}>
-            <View style={styles.visualPromptHeader}>
-              <IconSymbol name="video.fill" size={12} color="#C9A962" />
-              <Text style={[styles.visualPromptLabel, { fontFamily: "Inter-Medium" }]}>
-                Scene Description
-              </Text>
-            </View>
+            <Text style={[styles.visualPromptLabel, { fontFamily: "Inter-Medium" }]}>
+              Scene Description
+            </Text>
             <Text style={[styles.visualPromptText, { fontFamily: "Inter" }]}>
-              {enrichedSteps[currentStepIndex].visualPrompt}
+              {currentEnriched.visualPrompt}
             </Text>
           </View>
         )}
       </View>
 
-      {/* Navigation Controls - Single play/pause button here */}
-      <View style={styles.navigationControls}>
+      {/* Progress Bar */}
+      <View style={styles.progressContainer}>
+        <View style={styles.progressBar}>
+          <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
+        </View>
+        <View style={styles.timeContainer}>
+          <Text style={[styles.timeText, { fontFamily: "Inter" }]}>
+            {formatTime(elapsedTime)}
+          </Text>
+          <Text style={[styles.timeText, { fontFamily: "Inter" }]}>
+            {currentStep?.duration || "0:00"}
+          </Text>
+        </View>
+      </View>
+
+      {/* Controls */}
+      <View style={styles.controls}>
         <TouchableOpacity
-          style={[
-            styles.navButton,
-            currentStepIndex === 0 && styles.navButtonDisabled,
-          ]}
+          style={[styles.controlButton, currentStepIndex === 0 && styles.controlButtonDisabled]}
           onPress={handlePrevious}
           disabled={currentStepIndex === 0}
           activeOpacity={0.7}
         >
-          <IconSymbol name="backward.fill" size={24} color={currentStepIndex === 0 ? "#555555" : "#FFFFFF"} />
-          <Text style={[
-            styles.navButtonText, 
-            { fontFamily: "Inter" },
-            currentStepIndex === 0 && styles.navButtonTextDisabled,
-          ]}>
-            Previous
-          </Text>
+          <IconSymbol 
+            name="backward.fill" 
+            size={24} 
+            color={currentStepIndex === 0 ? "#555555" : "#FFFFFF"} 
+          />
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.playPauseButton, isPlaying && styles.playPauseButtonActive]}
+          style={styles.playButton}
           onPress={handlePlayPause}
           activeOpacity={0.8}
         >
           <IconSymbol 
             name={isPlaying ? "pause.fill" : "play.fill"} 
-            size={28} 
+            size={32} 
             color="#1A1A1A" 
           />
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[
-            styles.navButton,
-            currentStepIndex === steps.length - 1 && styles.navButtonDisabled,
-          ]}
+          style={[styles.controlButton, currentStepIndex === steps.length - 1 && styles.controlButtonDisabled]}
           onPress={handleNext}
           disabled={currentStepIndex === steps.length - 1}
           activeOpacity={0.7}
         >
-          <Text style={[
-            styles.navButtonText, 
-            { fontFamily: "Inter" },
-            currentStepIndex === steps.length - 1 && styles.navButtonTextDisabled,
-          ]}>
-            Next
-          </Text>
-          <IconSymbol name="forward.fill" size={24} color={currentStepIndex === steps.length - 1 ? "#555555" : "#FFFFFF"} />
+          <IconSymbol 
+            name="forward.fill" 
+            size={24} 
+            color={currentStepIndex === steps.length - 1 ? "#555555" : "#FFFFFF"} 
+          />
         </TouchableOpacity>
       </View>
 
-      {/* Steps List - Now in a scrollable container */}
-      <View style={styles.stepsListContainer}>
-        <Text style={[styles.stepsListTitle, { fontFamily: "Inter-Medium" }]}>
+      {/* All Steps List */}
+      <View style={styles.stepsSection}>
+        <Text style={[styles.stepsSectionTitle, { fontFamily: "Inter-Medium" }]}>
           ALL STEPS
         </Text>
         <ScrollView 
           ref={stepsScrollRef}
-          style={styles.stepsList}
+          style={styles.stepsScroll}
+          showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
-          showsVerticalScrollIndicator={true}
           nestedScrollEnabled={true}
         >
-          {steps.map((step, index) => (
-            <TouchableOpacity
-              key={step.number}
-              style={[
-                styles.stepItem,
-                index === currentStepIndex && styles.stepItemActive,
-                index < currentStepIndex && styles.stepItemCompleted,
-              ]}
-              onPress={() => handleStepPress(index)}
-              activeOpacity={0.7}
-            >
-              <View style={[
-                styles.stepNumber,
-                index === currentStepIndex && styles.stepNumberActive,
-                index < currentStepIndex && styles.stepNumberCompleted,
-              ]}>
-                {index < currentStepIndex ? (
-                  <IconSymbol name="checkmark" size={14} color="#1A1A1A" />
-                ) : (
-                  <Text style={[
-                    styles.stepNumberText,
-                    { fontFamily: "Inter-Medium" },
-                    index === currentStepIndex && styles.stepNumberTextActive,
-                  ]}>
-                    {step.number}
+          {steps.map((step, index) => {
+            const hasVideo = stepVideos.find(v => v.stepIndex === index && v.status === "completed");
+            return (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.stepItem,
+                  index === currentStepIndex && styles.stepItemActive,
+                ]}
+                onPress={() => handleStepPress(index)}
+                activeOpacity={0.7}
+              >
+                <View style={[
+                  styles.stepNumber,
+                  index === currentStepIndex && styles.stepNumberActive,
+                ]}>
+                  {hasVideo ? (
+                    <IconSymbol name="play.fill" size={12} color={index === currentStepIndex ? "#1A1A1A" : "#C9A962"} />
+                  ) : (
+                    <Text style={[
+                      styles.stepNumberText,
+                      { fontFamily: "Inter-Medium" },
+                      index === currentStepIndex && styles.stepNumberTextActive,
+                    ]}>
+                      {index + 1}
+                    </Text>
+                  )}
+                </View>
+                <View style={styles.stepContent}>
+                  <Text 
+                    style={[
+                      styles.stepInstruction, 
+                      { fontFamily: "Inter" },
+                      index === currentStepIndex && styles.stepInstructionActive,
+                    ]}
+                    numberOfLines={2}
+                  >
+                    {step.instruction}
                   </Text>
-                )}
-              </View>
-              <View style={styles.stepInfo}>
-                <Text 
-                  style={[
-                    styles.stepInstruction,
-                    { fontFamily: "Inter" },
-                    index === currentStepIndex && styles.stepInstructionActive,
-                  ]}
-                  numberOfLines={2}
-                >
-                  {step.instruction}
-                </Text>
-                <Text style={[styles.stepDuration, { fontFamily: "Inter" }]}>
-                  {step.duration}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+                  <Text style={[styles.stepDuration, { fontFamily: "Inter" }]}>
+                    {step.duration}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
       </View>
     </ScreenContainer>
@@ -615,254 +606,219 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   headerButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.1)",
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
     alignItems: "center",
     justifyContent: "center",
   },
   headerTitle: {
-    flex: 1,
     fontSize: 17,
     color: "#FFFFFF",
+    flex: 1,
     textAlign: "center",
-    marginHorizontal: 12,
+    marginHorizontal: 16,
   },
   videoContainer: {
-    marginHorizontal: 16,
-    borderRadius: 16,
+    width: SCREEN_WIDTH,
+    height: SCREEN_WIDTH * 0.65,
     overflow: "hidden",
-    backgroundColor: "#2A2A2A",
-    aspectRatio: 16 / 9,
+    position: "relative",
   },
   videoWrapper: {
-    flex: 1,
-    overflow: "hidden",
-  },
-  kenBurnsContainer: {
     width: "100%",
     height: "100%",
   },
-  videoPreview: {
+  video: {
     width: "100%",
     height: "100%",
   },
-  stepOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  videoPlaceholder: {
-    flex: 1,
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
   },
-  placeholderText: {
-    fontSize: 14,
-    color: "#666666",
+  imageWrapper: {
+    width: "120%",
+    height: "120%",
+    marginLeft: "-10%",
+    marginTop: "-10%",
   },
-  videoOverlay: {
-    position: "absolute",
-    top: 12,
-    left: 12,
-    right: 12,
-    flexDirection: "row",
-    justifyContent: "space-between",
+  stepImage: {
+    width: "100%",
+    height: "100%",
   },
-  stepBadge: {
-    backgroundColor: "rgba(0,0,0,0.6)",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  stepBadgeText: {
-    fontSize: 12,
-    color: "#FFFFFF",
-  },
-  timerBadge: {
-    flexDirection: "row",
+  imagePlaceholder: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#2A2A2A",
     alignItems: "center",
-    gap: 6,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    justifyContent: "center",
   },
-  timerText: {
-    fontSize: 12,
-    color: "#FFFFFF",
-  },
-  progressBarContainer: {
+  gradient: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    height: 4,
-    backgroundColor: "rgba(255,255,255,0.2)",
+    height: 100,
   },
-  progressBar: {
-    height: "100%",
-    backgroundColor: "#C9A962",
-  },
-  playingIndicator: {
+  stepBadge: {
     position: "absolute",
-    bottom: 16,
+    top: 16,
     left: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
+    backgroundColor: "rgba(201, 169, 98, 0.9)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
-  playingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#EF4444",
-  },
-  playingText: {
-    fontSize: 10,
-    color: "#FFFFFF",
+  stepBadgeText: {
+    fontSize: 11,
+    color: "#1A1A1A",
     letterSpacing: 1,
   },
-  pausedIndicator: {
+  tapHint: {
     position: "absolute",
-    bottom: 16,
-    left: 0,
-    right: 0,
-    alignItems: "center",
+    bottom: 20,
+    alignSelf: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
   },
-  pausedText: {
-    fontSize: 12,
-    color: "rgba(255,255,255,0.6)",
+  tapHintText: {
+    fontSize: 13,
+    color: "#FFFFFF",
   },
   currentStepContainer: {
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    gap: 8,
+    paddingTop: 16,
+    paddingBottom: 12,
   },
   currentStepLabel: {
     fontSize: 11,
     color: "#C9A962",
     letterSpacing: 1,
+    marginBottom: 8,
   },
   dishNameSubtitle: {
-    fontSize: 24,
+    fontSize: 20,
     color: "#FFFFFF",
     marginBottom: 8,
   },
   currentStepText: {
-    fontSize: 20,
+    fontSize: 16,
     color: "#FFFFFF",
-    lineHeight: 28,
+    lineHeight: 24,
   },
   visualPromptContainer: {
     marginTop: 12,
     padding: 12,
-    backgroundColor: "rgba(201,169,98,0.1)",
-    borderRadius: 12,
+    backgroundColor: "rgba(201, 169, 98, 0.1)",
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: "rgba(201,169,98,0.2)",
-  },
-  visualPromptHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 6,
+    borderColor: "rgba(201, 169, 98, 0.2)",
   },
   visualPromptLabel: {
-    fontSize: 10,
+    fontSize: 11,
     color: "#C9A962",
     letterSpacing: 0.5,
-    textTransform: "uppercase",
+    marginBottom: 6,
   },
   visualPromptText: {
     fontSize: 13,
-    color: "#AAAAAA",
+    color: "#888888",
     lineHeight: 18,
-    fontStyle: "italic",
   },
-  navigationControls: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+  progressContainer: {
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingBottom: 16,
   },
-  navButton: {
+  progressBar: {
+    height: 4,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 2,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: "#C9A962",
+    borderRadius: 2,
+  },
+  timeContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 8,
+  },
+  timeText: {
+    fontSize: 12,
+    color: "#888888",
+  },
+  controls: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    paddingVertical: 8,
+    justifyContent: "center",
+    gap: 32,
+    paddingVertical: 16,
   },
-  navButtonDisabled: {
+  controlButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  controlButtonDisabled: {
     opacity: 0.5,
   },
-  navButtonText: {
-    fontSize: 14,
-    color: "#FFFFFF",
-  },
-  navButtonTextDisabled: {
-    color: "#555555",
-  },
-  playPauseButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  playButton: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: "#C9A962",
     alignItems: "center",
     justifyContent: "center",
   },
-  playPauseButtonActive: {
-    backgroundColor: "#FFFFFF",
-  },
-  stepsListContainer: {
+  stepsSection: {
     flex: 1,
-    paddingHorizontal: 16,
-    minHeight: 150,
+    paddingHorizontal: 20,
   },
-  stepsListTitle: {
+  stepsSectionTitle: {
     fontSize: 11,
     color: "#888888",
     letterSpacing: 1,
     marginBottom: 12,
   },
-  stepsList: {
+  stepsScroll: {
     flex: 1,
   },
   stepItem: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
+    alignItems: "flex-start",
     paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    marginBottom: 8,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255, 255, 255, 0.05)",
   },
   stepItemActive: {
-    backgroundColor: "rgba(201,169,98,0.15)",
-    borderWidth: 1,
-    borderColor: "rgba(201,169,98,0.3)",
-  },
-  stepItemCompleted: {
-    opacity: 0.6,
+    backgroundColor: "rgba(201, 169, 98, 0.1)",
+    marginHorizontal: -12,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderBottomWidth: 0,
   },
   stepNumber: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.1)",
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
     alignItems: "center",
     justifyContent: "center",
+    marginRight: 12,
   },
   stepNumberActive: {
     backgroundColor: "#C9A962",
-  },
-  stepNumberCompleted: {
-    backgroundColor: "#4ADE80",
   },
   stepNumberText: {
     fontSize: 12,
@@ -871,20 +827,20 @@ const styles = StyleSheet.create({
   stepNumberTextActive: {
     color: "#1A1A1A",
   },
-  stepInfo: {
+  stepContent: {
     flex: 1,
-    gap: 4,
   },
   stepInstruction: {
     fontSize: 14,
     color: "#CCCCCC",
     lineHeight: 20,
+    marginBottom: 4,
   },
   stepInstructionActive: {
     color: "#FFFFFF",
   },
   stepDuration: {
     fontSize: 12,
-    color: "#888888",
+    color: "#666666",
   },
 });

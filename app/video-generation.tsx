@@ -14,13 +14,12 @@ import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { trpc } from "@/lib/trpc";
 
-const GENERATION_STEPS = [
-  { id: 1, label: "Analyzing recipe structure", duration: 2000 },
-  { id: 2, label: "Generating scene compositions", duration: 3000 },
-  { id: 3, label: "Creating cooking animations", duration: 4000 },
-  { id: 4, label: "Adding step-by-step narration", duration: 2500 },
-  { id: 5, label: "Finalizing video output", duration: 2000 },
-];
+interface StepVideo {
+  stepIndex: number;
+  videoUrl: string;
+  status: "pending" | "generating" | "completed" | "failed";
+  error?: string;
+}
 
 export default function VideoGenerationScreen() {
   const router = useRouter();
@@ -30,9 +29,11 @@ export default function VideoGenerationScreen() {
     imageUri?: string;
   }>();
 
-  const [currentStep, setCurrentStep] = useState(0);
-  const [progress, setProgress] = useState(0);
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [totalSteps, setTotalSteps] = useState(0);
+  const [stepVideos, setStepVideos] = useState<StepVideo[]>([]);
   const [isComplete, setIsComplete] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("Preparing video generation...");
   const [enrichedSteps, setEnrichedSteps] = useState<Array<{
     stepNumber: number;
     originalText: string;
@@ -40,8 +41,9 @@ export default function VideoGenerationScreen() {
     duration: number;
   }> | null>(null);
 
-  // tRPC mutation for video enrichment
+  // tRPC mutations
   const enrichForVideoMutation = trpc.recipe.enrichForVideo.useMutation();
+  const generateStepVideoMutation = trpc.recipe.generateStepVideo.useMutation();
 
   // Animations
   const spinValue = useRef(new Animated.Value(0)).current;
@@ -84,16 +86,37 @@ export default function VideoGenerationScreen() {
     return () => pulse.stop();
   }, [pulseValue]);
 
-  // Call enrichForVideo API on mount
+  // Main video generation flow
   useEffect(() => {
-    const enrichVideo = async () => {
-      if (!params.recipeData) return;
-      
+    const generateVideos = async () => {
+      if (!params.recipeData || !params.imageUri) {
+        setStatusMessage("Missing recipe data");
+        return;
+      }
+
       try {
+        // Parse recipe data
         const recipeData = JSON.parse(params.recipeData);
         const steps = recipeData.steps || [];
         
-        // Parse steps - handle both string array and Step object array
+        if (steps.length === 0) {
+          setStatusMessage("No steps found in recipe");
+          return;
+        }
+
+        setTotalSteps(steps.length);
+        
+        // Initialize step videos array
+        const initialStepVideos: StepVideo[] = steps.map((_: any, index: number) => ({
+          stepIndex: index,
+          videoUrl: "",
+          status: "pending" as const,
+        }));
+        setStepVideos(initialStepVideos);
+
+        // Step 1: Enrich prompts
+        setStatusMessage("Analyzing recipe for video generation...");
+        
         const parsedSteps = steps.map((step: unknown, index: number) => {
           if (typeof step === "string") {
             return { stepNumber: index + 1, instruction: step };
@@ -105,38 +128,97 @@ export default function VideoGenerationScreen() {
             duration: typeof stepObj.duration === "number" ? stepObj.duration : undefined,
           };
         });
-        
-        const result = await enrichForVideoMutation.mutateAsync({
-          title: params.dishName || "Recipe",
-          steps: parsedSteps,
-        });
-        
-        if (result.success && result.enrichedSteps) {
-          setEnrichedSteps(result.enrichedSteps);
-          console.log("Video prompts enriched:", result.enrichedSteps);
+
+        try {
+          const enrichResult = await enrichForVideoMutation.mutateAsync({
+            title: params.dishName || "Recipe",
+            steps: parsedSteps,
+          });
+          
+          if (enrichResult.success && enrichResult.enrichedSteps) {
+            setEnrichedSteps(enrichResult.enrichedSteps);
+            console.log("Video prompts enriched:", enrichResult.enrichedSteps.length, "steps");
+          }
+        } catch (enrichError) {
+          console.error("Failed to enrich prompts, continuing with basic prompts:", enrichError);
         }
-      } catch (error) {
-        console.error("Failed to enrich video prompts:", error);
-        // Continue without enriched prompts - fallback will be used
-      }
-    };
-    
-    enrichVideo();
-  }, [params.recipeData, params.dishName]);
 
-  // Progress through steps
-  useEffect(() => {
-    let stepIndex = 0;
-    let totalProgress = 0;
-    const totalDuration = GENERATION_STEPS.reduce((sum, step) => sum + step.duration, 0);
+        // Step 2: Generate videos for each step
+        const generatedVideos: StepVideo[] = [...initialStepVideos];
+        
+        for (let i = 0; i < parsedSteps.length; i++) {
+          const step = parsedSteps[i];
+          setCurrentStepIndex(i);
+          setStatusMessage(`Generating video for step ${i + 1} of ${parsedSteps.length}...`);
+          
+          // Update progress
+          const progress = ((i + 0.5) / parsedSteps.length) * 100;
+          Animated.timing(progressValue, {
+            toValue: progress,
+            duration: 500,
+            easing: Easing.linear,
+            useNativeDriver: false,
+          }).start();
 
-    const processStep = () => {
-      if (stepIndex >= GENERATION_STEPS.length) {
+          // Mark step as generating
+          generatedVideos[i] = { ...generatedVideos[i], status: "generating" };
+          setStepVideos([...generatedVideos]);
+
+          try {
+            // Call Runway API to generate video
+            const result = await generateStepVideoMutation.mutateAsync({
+              dishName: params.dishName || "Recipe",
+              imageUrl: params.imageUri,
+              stepInstruction: step.instruction,
+              stepNumber: step.stepNumber,
+            });
+
+            if (result.success && result.videoUrl) {
+              generatedVideos[i] = {
+                stepIndex: i,
+                videoUrl: result.videoUrl,
+                status: "completed",
+              };
+              console.log(`Step ${i + 1} video generated:`, result.videoUrl);
+            } else {
+              generatedVideos[i] = {
+                stepIndex: i,
+                videoUrl: "",
+                status: "failed",
+                error: result.error || "Unknown error",
+              };
+              console.error(`Step ${i + 1} video failed:`, result.error);
+            }
+          } catch (error: any) {
+            console.error(`Error generating video for step ${i + 1}:`, error);
+            generatedVideos[i] = {
+              stepIndex: i,
+              videoUrl: "",
+              status: "failed",
+              error: error?.message || "Generation failed",
+            };
+          }
+
+          setStepVideos([...generatedVideos]);
+          
+          // Update progress
+          const finalProgress = ((i + 1) / parsedSteps.length) * 100;
+          Animated.timing(progressValue, {
+            toValue: finalProgress,
+            duration: 500,
+            easing: Easing.linear,
+            useNativeDriver: false,
+          }).start();
+        }
+
+        // Complete
         setIsComplete(true);
+        setStatusMessage("Video generation complete!");
+        
         if (Platform.OS !== "web") {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
-        
+
         // Navigate to video player after short delay
         setTimeout(() => {
           router.replace({
@@ -146,46 +228,19 @@ export default function VideoGenerationScreen() {
               recipeData: params.recipeData,
               imageUri: params.imageUri,
               enrichedSteps: enrichedSteps ? JSON.stringify(enrichedSteps) : undefined,
+              stepVideos: JSON.stringify(generatedVideos),
             },
           });
-        }, 1000);
-        return;
+        }, 1500);
+
+      } catch (error) {
+        console.error("Video generation error:", error);
+        setStatusMessage("Video generation failed. Please try again.");
       }
-
-      const step = GENERATION_STEPS[stepIndex];
-      setCurrentStep(stepIndex);
-
-      // Animate progress
-      const stepProgress = (step.duration / totalDuration) * 100;
-      totalProgress += stepProgress;
-
-      Animated.timing(progressValue, {
-        toValue: totalProgress,
-        duration: step.duration,
-        easing: Easing.linear,
-        useNativeDriver: false,
-      }).start();
-
-      // Update progress state for display
-      const progressInterval = setInterval(() => {
-        setProgress((prev) => {
-          const target = totalProgress;
-          if (prev >= target - 1) {
-            clearInterval(progressInterval);
-            return target;
-          }
-          return prev + 1;
-        });
-      }, step.duration / stepProgress);
-
-      setTimeout(() => {
-        stepIndex++;
-        processStep();
-      }, step.duration);
     };
 
-    processStep();
-  }, [params.dishName, params.recipeData, params.imageUri, progressValue, router, enrichedSteps]);
+    generateVideos();
+  }, [params.recipeData, params.imageUri, params.dishName]);
 
   const spin = spinValue.interpolate({
     inputRange: [0, 1],
@@ -197,50 +252,42 @@ export default function VideoGenerationScreen() {
     outputRange: ["0%", "100%"],
   });
 
+  const completedCount = stepVideos.filter(v => v.status === "completed").length;
+  const failedCount = stepVideos.filter(v => v.status === "failed").length;
+
   return (
-    <ScreenContainer 
-      edges={["top", "left", "right", "bottom"]} 
-      containerClassName="bg-background"
-    >
+    <ScreenContainer className="bg-[#1A1A1A]">
       <View style={styles.container}>
         {/* Animated Icon */}
-        <View style={styles.iconContainer}>
-          <Animated.View 
-            style={[
-              styles.spinRing,
-              { transform: [{ rotate: spin }] }
-            ]}
-          >
-            <View style={styles.ringSegment} />
-            <View style={[styles.ringSegment, styles.ringSegment2]} />
-            <View style={[styles.ringSegment, styles.ringSegment3]} />
-          </Animated.View>
-          
-          <Animated.View 
-            style={[
-              styles.centerIcon,
-              { transform: [{ scale: pulseValue }] }
-            ]}
-          >
+        <Animated.View 
+          style={[
+            styles.iconContainer,
+            { transform: [{ rotate: spin }, { scale: pulseValue }] }
+          ]}
+        >
+          <View style={styles.iconInner}>
             <IconSymbol 
-              name={isComplete ? "checkmark.circle.fill" : "video.fill"} 
-              size={40} 
+              name={isComplete ? "checkmark" : "sparkles"} 
+              size={48} 
               color="#C9A962" 
             />
-          </Animated.View>
-        </View>
+          </View>
+        </Animated.View>
 
         {/* Title */}
         <Text style={[styles.title, { fontFamily: "PlayfairDisplay-Bold" }]}>
-          {isComplete ? "Video Ready!" : "Generating Video"}
+          {isComplete ? "Videos Ready!" : "Creating AI Videos"}
         </Text>
 
         {/* Dish Name */}
-        {params.dishName && (
-          <Text style={[styles.dishName, { fontFamily: "Caveat" }]}>
-            {params.dishName}
-          </Text>
-        )}
+        <Text style={[styles.dishName, { fontFamily: "Inter" }]}>
+          {params.dishName || "Recipe"}
+        </Text>
+
+        {/* Status Message */}
+        <Text style={[styles.statusMessage, { fontFamily: "Inter" }]}>
+          {statusMessage}
+        </Text>
 
         {/* Progress Bar */}
         <View style={styles.progressContainer}>
@@ -252,51 +299,55 @@ export default function VideoGenerationScreen() {
               ]} 
             />
           </View>
-          <Text style={[styles.progressText, { fontFamily: "Inter-Medium" }]}>
-            {Math.round(progress)}%
-          </Text>
-        </View>
-
-        {/* Current Step */}
-        <View style={styles.stepsContainer}>
-          {GENERATION_STEPS.map((step, index) => (
-            <View 
-              key={step.id} 
-              style={[
-                styles.stepRow,
-                index === currentStep && styles.stepRowActive,
-                index < currentStep && styles.stepRowComplete,
-              ]}
-            >
-              <View style={[
-                styles.stepIndicator,
-                index === currentStep && styles.stepIndicatorActive,
-                index < currentStep && styles.stepIndicatorComplete,
-              ]}>
-                {index < currentStep ? (
-                  <IconSymbol name="checkmark" size={12} color="#1A1A1A" />
-                ) : index === currentStep ? (
-                  <View style={styles.stepDot} />
-                ) : null}
-              </View>
-              <Text style={[
-                styles.stepLabel,
-                { fontFamily: "Inter" },
-                index === currentStep && styles.stepLabelActive,
-                index < currentStep && styles.stepLabelComplete,
-              ]}>
-                {step.label}
+          
+          {/* Step Counter */}
+          {totalSteps > 0 && (
+            <View style={styles.stepCounter}>
+              <Text style={[styles.stepCounterText, { fontFamily: "Inter-Medium" }]}>
+                {completedCount} of {totalSteps} steps
               </Text>
+              {failedCount > 0 && (
+                <Text style={[styles.failedText, { fontFamily: "Inter" }]}>
+                  ({failedCount} failed)
+                </Text>
+              )}
             </View>
-          ))}
+          )}
         </View>
 
-        {/* Tip */}
-        <View style={styles.tipContainer}>
-          <Text style={[styles.tipText, { fontFamily: "Inter" }]}>
-            This usually takes about 30 seconds. Your video will include step-by-step cooking instructions.
-          </Text>
-        </View>
+        {/* Step Status List */}
+        {stepVideos.length > 0 && (
+          <View style={styles.stepsList}>
+            {stepVideos.slice(0, 5).map((video, index) => (
+              <View key={index} style={styles.stepItem}>
+                <View style={[
+                  styles.stepDot,
+                  video.status === "completed" && styles.stepDotCompleted,
+                  video.status === "generating" && styles.stepDotGenerating,
+                  video.status === "failed" && styles.stepDotFailed,
+                ]} />
+                <Text style={[styles.stepText, { fontFamily: "Inter" }]}>
+                  Step {index + 1}
+                  {video.status === "generating" && " - Generating..."}
+                  {video.status === "completed" && " - Done"}
+                  {video.status === "failed" && " - Failed"}
+                </Text>
+              </View>
+            ))}
+            {stepVideos.length > 5 && (
+              <Text style={[styles.moreSteps, { fontFamily: "Inter" }]}>
+                +{stepVideos.length - 5} more steps...
+              </Text>
+            )}
+          </View>
+        )}
+
+        {/* Info Text */}
+        <Text style={[styles.infoText, { fontFamily: "Inter" }]}>
+          {isComplete 
+            ? "Your cooking videos are ready to play!"
+            : "AI is generating unique videos for each cooking step. This may take a few minutes..."}
+        </Text>
       </View>
     </ScreenContainer>
   );
@@ -310,61 +361,45 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   iconContainer: {
-    width: 140,
-    height: 140,
-    justifyContent: "center",
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: "rgba(201, 169, 98, 0.1)",
     alignItems: "center",
+    justifyContent: "center",
     marginBottom: 32,
   },
-  spinRing: {
-    position: "absolute",
-    width: 140,
-    height: 140,
-  },
-  ringSegment: {
-    position: "absolute",
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    borderWidth: 3,
-    borderColor: "transparent",
-    borderTopColor: "#C9A962",
-  },
-  ringSegment2: {
-    transform: [{ rotate: "120deg" }],
-    borderTopColor: "rgba(201, 169, 98, 0.5)",
-  },
-  ringSegment3: {
-    transform: [{ rotate: "240deg" }],
-    borderTopColor: "rgba(201, 169, 98, 0.25)",
-  },
-  centerIcon: {
+  iconInner: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: "rgba(201, 169, 98, 0.15)",
-    justifyContent: "center",
+    backgroundColor: "rgba(201, 169, 98, 0.2)",
     alignItems: "center",
+    justifyContent: "center",
   },
   title: {
     fontSize: 28,
     color: "#FFFFFF",
+    textAlign: "center",
     marginBottom: 8,
   },
   dishName: {
-    fontSize: 22,
+    fontSize: 16,
     color: "#C9A962",
-    marginBottom: 32,
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  statusMessage: {
+    fontSize: 14,
+    color: "#888888",
+    textAlign: "center",
+    marginBottom: 24,
   },
   progressContainer: {
     width: "100%",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 32,
+    marginBottom: 24,
   },
   progressBar: {
-    flex: 1,
     height: 8,
     backgroundColor: "rgba(255, 255, 255, 0.1)",
     borderRadius: 4,
@@ -375,71 +410,59 @@ const styles = StyleSheet.create({
     backgroundColor: "#C9A962",
     borderRadius: 4,
   },
-  progressText: {
-    fontSize: 14,
-    color: "#C9A962",
-    width: 45,
-    textAlign: "right",
-  },
-  stepsContainer: {
-    width: "100%",
-    gap: 12,
-    marginBottom: 32,
-  },
-  stepRow: {
+  stepCounter: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    opacity: 0.4,
-  },
-  stepRowActive: {
-    opacity: 1,
-  },
-  stepRowComplete: {
-    opacity: 0.7,
-  },
-  stepIndicator: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
     justifyContent: "center",
     alignItems: "center",
+    marginTop: 12,
+    gap: 8,
   },
-  stepIndicatorActive: {
-    backgroundColor: "rgba(201, 169, 98, 0.3)",
-    borderWidth: 2,
-    borderColor: "#C9A962",
+  stepCounterText: {
+    fontSize: 14,
+    color: "#FFFFFF",
   },
-  stepIndicatorComplete: {
-    backgroundColor: "#C9A962",
+  failedText: {
+    fontSize: 12,
+    color: "#EF4444",
+  },
+  stepsList: {
+    width: "100%",
+    marginBottom: 24,
+  },
+  stepItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
   },
   stepDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
+    backgroundColor: "#555555",
+    marginRight: 12,
+  },
+  stepDotCompleted: {
+    backgroundColor: "#22C55E",
+  },
+  stepDotGenerating: {
     backgroundColor: "#C9A962",
   },
-  stepLabel: {
-    fontSize: 14,
-    color: "#888888",
+  stepDotFailed: {
+    backgroundColor: "#EF4444",
   },
-  stepLabelActive: {
-    color: "#FFFFFF",
-  },
-  stepLabelComplete: {
-    color: "#AAAAAA",
-  },
-  tipContainer: {
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.08)",
-  },
-  tipText: {
+  stepText: {
     fontSize: 13,
     color: "#888888",
+  },
+  moreSteps: {
+    fontSize: 12,
+    color: "#666666",
+    marginTop: 4,
+    marginLeft: 20,
+  },
+  infoText: {
+    fontSize: 13,
+    color: "#666666",
     textAlign: "center",
     lineHeight: 20,
   },

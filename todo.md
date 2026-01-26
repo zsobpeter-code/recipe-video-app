@@ -319,3 +319,29 @@
 - [x] Fixed: Properly format ingredients/steps as JSON strings
 - [x] Fixed: Handle both string and object types for nested data
 - [x] Added detailed error logging for debugging
+
+## Feature: Runway Gen-3 API Integration
+
+### Phase 1: SDK and Service Setup
+- [x] Install @runwayml/sdk package
+- [x] Create server/runwayService.ts with generateVideoFromImage, checkVideoStatus, waitForVideo
+- [x] Add createCookingVideoPrompt helper for cinematic prompts
+
+### Phase 2: Video Generation Service
+- [x] Update videoStorageService.ts to use Runway API
+- [x] Add generateStepVideos for batch processing
+- [x] Add generateSingleStepVideo for individual steps
+- [x] Add generateStepVideo tRPC endpoint
+- [ ] Save videos to Supabase recipe-videos bucket (pending storage setup)
+
+### Phase 3: Video Player Update
+- [x] Updated video-player.tsx with expo-video VideoView component
+- [x] Added stepVideos param for passing generated videos
+- [x] Auto-advance to next step when video ends
+- [x] Shows "AI VIDEO" badge when playing real videos
+- [x] Fallback to Ken Burns animation for steps without video
+
+### Configuration
+- Model: gen3a_turbo (faster, cheaper)
+- Duration: 5 seconds per step
+- Ratio: 9:16 (vertical)

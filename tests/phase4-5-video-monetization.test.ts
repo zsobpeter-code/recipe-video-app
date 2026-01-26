@@ -130,10 +130,10 @@ describe("Phase 4 & 5: Video Generation & Monetization", () => {
       const videoGenPath = path.join(projectRoot, "app/video-generation.tsx");
       const content = fs.readFileSync(videoGenPath, "utf-8");
       
-      expect(content).toContain("GENERATION_STEPS");
-      expect(content).toContain("Analyzing recipe structure");
-      expect(content).toContain("Generating scene compositions");
-      expect(content).toContain("Creating cooking animations");
+      // New video generation uses actual Runway API calls
+      expect(content).toContain("generateStepVideo");
+      expect(content).toContain("Generating video for step");
+      expect(content).toContain("enrichForVideo");
     });
 
     it("should navigate to video player on completion", () => {
@@ -185,7 +185,7 @@ describe("Phase 4 & 5: Video Generation & Monetization", () => {
       const content = fs.readFileSync(videoPlayerPath, "utf-8");
       
       expect(content).toContain("ALL STEPS");
-      expect(content).toContain("stepsList");
+      expect(content).toContain("stepsScroll");
       expect(content).toContain("steps.map");
     });
   });

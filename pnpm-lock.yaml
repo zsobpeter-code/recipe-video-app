@@ -32,6 +32,9 @@ importers:
       '@react-navigation/native':
         specifier: ^7.1.25
         version: 7.1.25(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
+      '@runwayml/sdk':
+        specifier: ^3.11.0
+        version: 3.11.0
       '@supabase/supabase-js':
         specifier: ^2.91.1
         version: 2.91.1
@@ -2149,6 +2152,10 @@ packages:
 
   '@rtsao/scc@1.1.0':
     resolution: {integrity: sha512-zt6OdqaDoOnJ1ZYsCYGt9YmWzDXl4vQdKTyJev62gFhRGKdx7mcT54V9KIjg+d2wi9EXsPvAPKe7i7WjfVWB8g==}
+
+  '@runwayml/sdk@3.11.0':
+    resolution: {integrity: sha512-BDAywDbfS3/TCN5DpRYBdmaJizbX8gbuxKxqPh9pTl5O2f+tOiLZjj4ydqb9HJU7dMPdAMYdtpqtDUT3/M6Pkg==}
+    hasBin: true
 
   '@sinclair/typebox@0.27.8':
     resolution: {integrity: sha512-+Fj43pSMwJs4KRrH/938Uf+uAELIgVBmQzg/q1YG10djyfA3TnrU8N8XzqCh/okZdszqBQTZf96idMfE5lnwTA==}
@@ -8187,6 +8194,8 @@ snapshots:
     optional: true
 
   '@rtsao/scc@1.1.0': {}
+
+  '@runwayml/sdk@3.11.0': {}
 
   '@sinclair/typebox@0.27.8': {}
 

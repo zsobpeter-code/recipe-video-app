@@ -496,6 +496,50 @@ Always return your response as valid JSON matching this exact structure:
           };
         }
       }),
+
+    // Generate AI video for a single cooking step using Runway API
+    generateStepVideo: publicProcedure
+      .input(z.object({
+        dishName: z.string().describe("Name of the dish"),
+        imageUrl: z.string().describe("Source image URL for video generation"),
+        stepInstruction: z.string().describe("Step instruction text"),
+        stepNumber: z.number().describe("Step number (1-based)"),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          const { generateSingleStepVideo } = await import("./videoStorageService");
+          
+          const result = await generateSingleStepVideo(
+            input.dishName,
+            input.imageUrl,
+            input.stepInstruction,
+            input.stepNumber
+          );
+
+          if (result.status === "SUCCEEDED" && result.videoUrl) {
+            return {
+              success: true,
+              videoUrl: result.videoUrl,
+              taskId: result.taskId,
+            };
+          } else {
+            return {
+              success: false,
+              error: result.error || "Video generation failed",
+              videoUrl: null,
+              taskId: result.taskId,
+            };
+          }
+        } catch (error) {
+          console.error("Step video generation error:", error);
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to generate step video",
+            videoUrl: null,
+            taskId: null,
+          };
+        }
+      }),
   }),
 });
 
