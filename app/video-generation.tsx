@@ -13,7 +13,7 @@ import * as Haptics from "expo-haptics";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { trpc } from "@/lib/trpc";
-import { concatenateStepVideos, isFFmpegAvailable, type ConcatProgress } from "@/lib/videoConcatService";
+import { concatenateStepVideos, isFFmpegAvailable, uploadFinalVideoToSupabase, type ConcatProgress } from "@/lib/videoConcatService";
 
 interface StepVideo {
   stepIndex: number;
@@ -52,6 +52,7 @@ export default function VideoGenerationScreen() {
   const enrichForVideoMutation = trpc.recipe.enrichForVideo.useMutation();
   const generateStepVideoMutation = trpc.recipe.generateStepVideo.useMutation();
   const updateStepVideosMutation = trpc.recipe.updateStepVideos.useMutation();
+  const updateFinalVideoUrlMutation = trpc.recipe.updateFinalVideoUrl.useMutation();
 
   // Animations
   const spinValue = useRef(new Animated.Value(0)).current;
@@ -385,6 +386,37 @@ export default function VideoGenerationScreen() {
               concatenatedVideoPath = concatResult.localPath;
               setFinalVideoPath(concatResult.localPath);
               console.log("[VideoGeneration] Concatenated video:", concatResult.localPath);
+              
+              // Upload to Supabase Storage
+              setStatusMessage("Uploading video...");
+              try {
+                const uploadResult = await uploadFinalVideoToSupabase(
+                  concatResult.localPath,
+                  params.recipeId || `temp_${Date.now()}`,
+                  params.userId || "anonymous"
+                );
+                
+                if (uploadResult.success && uploadResult.url) {
+                  console.log("[VideoGeneration] Uploaded to Supabase:", uploadResult.url);
+                  
+                  // Save URL to database
+                  if (params.recipeId) {
+                    try {
+                      await updateFinalVideoUrlMutation.mutateAsync({
+                        recipeId: params.recipeId,
+                        finalVideoUrl: uploadResult.url,
+                      });
+                      console.log("[VideoGeneration] Saved final video URL to database");
+                    } catch (saveError) {
+                      console.error("[VideoGeneration] Failed to save final video URL:", saveError);
+                    }
+                  }
+                } else {
+                  console.warn("[VideoGeneration] Upload failed:", uploadResult.error);
+                }
+              } catch (uploadError) {
+                console.error("[VideoGeneration] Upload error:", uploadError);
+              }
             } else {
               console.warn("[VideoGeneration] Concatenation failed:", concatResult.error);
             }

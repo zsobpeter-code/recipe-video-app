@@ -8,6 +8,8 @@
 import { FFmpegKit, ReturnCode } from "ffmpeg-kit-react-native";
 import * as FileSystem from "expo-file-system/legacy";
 import { Platform } from "react-native";
+import { supabase } from "@/lib/supabase";
+import { decode } from "base64-arraybuffer";
 
 export interface ConcatResult {
   localPath: string;
@@ -239,5 +241,55 @@ export async function deleteLocalVideo(localPath: string): Promise<void> {
     await FileSystem.deleteAsync(localPath, { idempotent: true });
   } catch (error) {
     console.warn(`[FFmpeg] Error deleting video:`, error);
+  }
+}
+
+/**
+ * Upload the final concatenated video to Supabase Storage
+ * 
+ * @param localPath - Local file path to the video
+ * @param recipeId - Recipe ID for naming
+ * @param userId - User ID for storage path
+ * @returns HTTPS URL of the uploaded video
+ */
+export async function uploadFinalVideoToSupabase(
+  localPath: string,
+  recipeId: string,
+  userId: string = "anonymous"
+): Promise<{ success: boolean; url?: string; error?: string }> {
+  try {
+    console.log(`[VideoUpload] Starting upload for recipe ${recipeId}`);
+    
+    // Read file as base64
+    const base64 = await FileSystem.readAsStringAsync(localPath, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    
+    const storagePath = `${userId}/${recipeId}/final_video.mp4`;
+    
+    // Upload to Supabase Storage
+    const { error: uploadError } = await supabase.storage
+      .from("recipe-videos")
+      .upload(storagePath, decode(base64), {
+        contentType: "video/mp4",
+        upsert: true,
+      });
+    
+    if (uploadError) {
+      console.error(`[VideoUpload] Upload error:`, uploadError);
+      return { success: false, error: uploadError.message };
+    }
+    
+    // Get public URL
+    const { data } = supabase.storage
+      .from("recipe-videos")
+      .getPublicUrl(storagePath);
+    
+    console.log(`[VideoUpload] Success! URL: ${data.publicUrl}`);
+    
+    return { success: true, url: data.publicUrl };
+  } catch (error: any) {
+    console.error(`[VideoUpload] Error:`, error);
+    return { success: false, error: error?.message || "Upload failed" };
   }
 }

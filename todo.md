@@ -502,3 +502,35 @@ After generating individual step videos, concatenate them into a single video fi
 - [x] Add share button with expo-sharing integration
 - [x] Add "Share to TikTok / Instagram" button in video player
 - [x] Clean up temp files after concatenation
+
+
+## Feature - Comprehensive Sharing Features
+
+### Part 1: Upload Final Video to Supabase
+- [x] Create uploadFinalVideoToSupabase function in videoConcatService.ts
+- [x] Upload concatenated video to recipe-videos bucket
+- [x] Save final_video_url to recipe record via updateFinalVideoUrl mutation
+- [x] Call upload after concatenation completes in video-generation.tsx
+
+### Part 2: Image Selection (Original vs AI Generated)
+- [x] Add generatedImageUrl and primaryImageUrl fields to SavedRecipe interface
+- [x] Create ImageSelector component
+- [x] Add updatePrimaryImage and updateGeneratedImage tRPC endpoints
+- [ ] Integrate ImageSelector into recipe-card screen
+
+### Part 3: Share Recipe Card (Image)
+- [x] Install react-native-view-shot
+- [x] Create ShareableRecipeCard component with ViewShot
+- [x] Create shareRecipeCardImage function in recipeShareService.ts
+- [x] Share via expo-sharing
+
+### Part 4: Share Recipe PDF
+- [x] Install expo-print
+- [x] Create shareRecipePDF function in recipeShareService.ts
+- [x] Generate HTML with recipe content, ingredients, steps, and step photos
+- [x] Convert to PDF and share
+
+### Part 5: Share Menu UI
+- [x] Create ShareMenu modal component
+- [x] Show available share options based on recipe content (card, PDF, AI photo, video)
+- [ ] Integrate ShareMenu with recipe-card screen

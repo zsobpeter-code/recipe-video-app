@@ -86,12 +86,7 @@ const config: ExpoConfig = {
   },
   plugins: [
     "expo-router",
-    [
-      "ffmpeg-kit-react-native",
-      {
-        package: "min-gpl",
-      },
-    ],
+    // Note: ffmpeg-kit-react-native is used at runtime only, not as a config plugin
     [
       "expo-audio",
       {

@@ -60,6 +60,8 @@ export interface SavedRecipe {
   tags: string | null; // JSON string
   imageUrl: string | null; // AI-generated or main display image
   originalImageUrl: string | null; // Original captured/uploaded image (e.g., handwritten recipe)
+  generatedImageUrl: string | null; // AI-generated food photo
+  primaryImageUrl: string | null; // User's chosen primary image (original or generated)
   stepImages: string | null; // JSON string of step images with HTTPS URLs
   stepVideos: string | null; // JSON string of step videos with HTTPS URLs
   finalVideoUrl: string | null; // URL of concatenated final video for sharing
@@ -257,6 +259,8 @@ Always return your response as valid JSON matching this exact structure:
             tags: input.tags || null,
             imageUrl: input.imageUrl || null,
             originalImageUrl: input.originalImageUrl || null,
+            generatedImageUrl: null,
+            primaryImageUrl: null,
             stepImages: input.stepImages || null,
             stepVideos: input.stepVideos || null,
             finalVideoUrl: null,
@@ -474,6 +478,63 @@ Always return your response as valid JSON matching this exact structure:
           return {
             success: false,
             error: error instanceof Error ? error.message : "Failed to update final video URL",
+          };
+        }
+      }),
+
+    // Update primary image selection for a recipe
+    updatePrimaryImage: publicProcedure
+      .input(z.object({
+        recipeId: z.string().describe("Recipe ID to update"),
+        primaryImageUrl: z.string().describe("URL of the selected primary image"),
+        imageType: z.enum(["original", "generated"]).describe("Type of image selected"),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          const recipe = recipes.get(input.recipeId);
+          if (!recipe) {
+            return { success: false, error: "Recipe not found" };
+          }
+          
+          recipe.primaryImageUrl = input.primaryImageUrl;
+          recipe.updatedAt = new Date().toISOString();
+          recipes.set(input.recipeId, recipe);
+          
+          console.log(`[Recipe] Updated primary image for ${input.recipeId} to ${input.imageType}`);
+          return { success: true };
+        } catch (error) {
+          console.error("Update primary image error:", error);
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to update primary image",
+          };
+        }
+      }),
+
+    // Update generated image URL for a recipe
+    updateGeneratedImage: publicProcedure
+      .input(z.object({
+        recipeId: z.string().describe("Recipe ID to update"),
+        generatedImageUrl: z.string().describe("URL of the AI-generated image"),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          const recipe = recipes.get(input.recipeId);
+          if (!recipe) {
+            return { success: false, error: "Recipe not found" };
+          }
+          
+          recipe.generatedImageUrl = input.generatedImageUrl;
+          recipe.updatedAt = new Date().toISOString();
+          recipes.set(input.recipeId, recipe);
+          
+          console.log(`[Recipe] Updated generated image for ${input.recipeId}`);
+          return { success: true };
+        } catch (error) {
+          console.error("Update generated image error:", error);
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to update generated image",
           };
         }
       }),
