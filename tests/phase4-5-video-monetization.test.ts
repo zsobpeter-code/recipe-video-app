@@ -87,10 +87,16 @@ describe("Phase 4 & 5: Video Generation & Monetization", () => {
       const paywallPath = path.join(projectRoot, "app/paywall.tsx");
       const content = fs.readFileSync(paywallPath, "utf-8");
       
-      expect(content).toContain("PRICING_OPTIONS");
+      // Video pricing
+      expect(content).toContain("VIDEO_PRICING_OPTIONS");
+      expect(content).toContain("$4.99");
+      expect(content).toContain("$17.49");
+      expect(content).toContain("$29.99/mo");
+      // Step photos pricing
+      expect(content).toContain("STEP_PHOTOS_PRICING_OPTIONS");
       expect(content).toContain("$1.99");
-      expect(content).toContain("$6.99");
-      expect(content).toContain("$19.99/mo");
+      expect(content).toContain("$7.49");
+      expect(content).toContain("$9.99/mo");
       expect(content).toContain("Best Value");
     });
 

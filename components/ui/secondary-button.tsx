@@ -4,6 +4,7 @@ import { Platform } from "react-native";
 
 export interface SecondaryButtonProps {
   title: string;
+  subtitle?: string;
   onPress: () => void;
   disabled?: boolean;
   loading?: boolean;
@@ -14,6 +15,7 @@ export interface SecondaryButtonProps {
 
 export function SecondaryButton({
   title,
+  subtitle,
   onPress,
   disabled = false,
   loading = false,
@@ -45,7 +47,10 @@ export function SecondaryButton({
       ) : (
         <View style={styles.content}>
           {icon && <View style={styles.icon}>{icon}</View>}
-          <Text style={styles.text}>{title}</Text>
+          <View style={styles.textContainer}>
+            <Text style={styles.text}>{title}</Text>
+            {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+          </View>
         </View>
       )}
     </TouchableOpacity>
@@ -82,5 +87,14 @@ const styles = StyleSheet.create({
     fontFamily: "Inter-Medium",
     fontSize: 16,
     color: "#C9A962",
+  },
+  textContainer: {
+    alignItems: "center",
+  },
+  subtitle: {
+    fontFamily: "Inter",
+    fontSize: 11,
+    color: "#888888",
+    marginTop: 2,
   },
 });

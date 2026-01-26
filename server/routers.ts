@@ -7,6 +7,7 @@ import { invokeLLM } from "./_core/llm";
 import { storagePut } from "./storage";
 import { generateImage } from "./_core/imageGeneration";
 import { enrichRecipeForVideo, type EnrichedStep } from "./videoPromptEnricher";
+import { generateSingleStepPhoto } from "./stepPhotoService";
 
 // Recipe analysis response schema
 const recipeSchema = z.object({
@@ -417,6 +418,47 @@ Always return your response as valid JSON matching this exact structure:
           return {
             success: false,
             error: error instanceof Error ? error.message : "Failed to generate image",
+            imageUrl: null,
+          };
+        }
+      }),
+
+    // Generate AI photo for a single cooking step
+    generateStepPhotos: publicProcedure
+      .input(z.object({
+        recipeId: z.string().describe("Recipe ID"),
+        dishName: z.string().describe("Name of the dish"),
+        stepIndex: z.number().describe("Step index (0-based)"),
+        stepInstruction: z.string().describe("Step instruction text"),
+        totalSteps: z.number().describe("Total number of steps"),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          const result = await generateSingleStepPhoto(
+            input.recipeId,
+            input.dishName,
+            input.stepInstruction,
+            input.stepIndex,
+            input.totalSteps
+          );
+
+          if (result) {
+            return {
+              success: true,
+              imageUrl: result.imageUrl,
+            };
+          } else {
+            return {
+              success: false,
+              error: "Failed to generate step photo",
+              imageUrl: null,
+            };
+          }
+        } catch (error) {
+          console.error("Step photo generation error:", error);
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to generate step photo",
             imageUrl: null,
           };
         }

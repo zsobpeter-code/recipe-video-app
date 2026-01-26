@@ -260,11 +260,11 @@ export default function RecipeCardScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
     
-    // Navigate directly to video player in cook mode (free, no paywall)
+    // Navigate to dedicated Cook Mode screen (free, no paywall)
     const cookImageUri = generatedPhotoUri || displayImageUri;
     
     router.push({
-      pathname: "/video-player" as any,
+      pathname: "/cook-mode" as any,
       params: {
         dishName: params.dishName,
         recipeData: JSON.stringify({
@@ -274,9 +274,11 @@ export default function RecipeCardScreen() {
           steps: params.steps,
           prepTime: params.prepTime,
           cookTime: params.cookTime,
+          servings: params.servings,
+          difficulty: params.difficulty,
         }),
         imageUri: cookImageUri,
-        mode: "cook", // Cook mode = free step-by-step view
+        recipeId: savedRecipeId || undefined,
       },
     });
   };
@@ -721,6 +723,7 @@ export default function RecipeCardScreen() {
         />
         <SecondaryButton
           title="Video"
+          subtitle="$4.99"
           onPress={handleGenerateVideo}
           icon={<IconSymbol name="video.fill" size={16} color="#C9A962" />}
           style={{ flex: 1 }}

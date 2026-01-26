@@ -25,27 +25,53 @@ interface PricingOption {
   credits?: number;
 }
 
-const PRICING_OPTIONS: PricingOption[] = [
+const VIDEO_PRICING_OPTIONS: PricingOption[] = [
   {
     id: "single",
     title: "Single Video",
     subtitle: "Pay as you go",
-    price: "$1.99",
+    price: "$4.99",
     credits: 1,
   },
   {
     id: "pack5",
     title: "5 Video Pack",
     subtitle: "Save 30%",
-    price: "$6.99",
-    pricePerVideo: "$1.40/video",
+    price: "$17.49",
+    pricePerVideo: "$3.50/video",
     credits: 5,
   },
   {
     id: "unlimited",
     title: "Unlimited",
     subtitle: "Best Value",
-    price: "$19.99/mo",
+    price: "$29.99/mo",
+    isBestValue: true,
+    credits: -1, // unlimited
+  },
+];
+
+const STEP_PHOTOS_PRICING_OPTIONS: PricingOption[] = [
+  {
+    id: "single",
+    title: "This Recipe",
+    subtitle: "One-time purchase",
+    price: "$1.99",
+    credits: 1,
+  },
+  {
+    id: "pack5",
+    title: "5 Recipe Pack",
+    subtitle: "Save 25%",
+    price: "$7.49",
+    pricePerVideo: "$1.50/recipe",
+    credits: 5,
+  },
+  {
+    id: "unlimited",
+    title: "Unlimited Photos",
+    subtitle: "Best Value",
+    price: "$9.99/mo",
     isBestValue: true,
     credits: -1, // unlimited
   },
@@ -65,7 +91,11 @@ export default function PaywallScreen() {
     dishName?: string;
     recipeData?: string;
     imageUri?: string;
+    productType?: string; // "video" or "step_photos"
+    recipeId?: string;
   }>();
+
+  const isStepPhotos = params.productType === "step_photos";
   
   const [selectedOption, setSelectedOption] = useState<string>("pack5");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -94,8 +124,20 @@ export default function PaywallScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
 
-    // Navigate to video generation with recipe data
-    if (params.recipeData) {
+    // Navigate based on product type
+    if (isStepPhotos) {
+      // Navigate to step photo generation
+      router.replace({
+        pathname: "/step-photo-generation" as any,
+        params: {
+          dishName: params.dishName,
+          recipeData: params.recipeData,
+          imageUri: params.imageUri,
+          recipeId: params.recipeId,
+        },
+      });
+    } else if (params.recipeData) {
+      // Navigate to video generation
       router.replace({
         pathname: "/video-generation" as any,
         params: {
@@ -108,7 +150,7 @@ export default function PaywallScreen() {
       // Just close paywall if no recipe data
       Alert.alert(
         "Purchase Successful!",
-        "You now have access to video generation.",
+        "You now have access to this feature.",
         [{ text: "OK", onPress: () => router.back() }]
       );
     }
@@ -158,10 +200,12 @@ export default function PaywallScreen() {
 
         {/* Title */}
         <Text style={[styles.title, { fontFamily: "PlayfairDisplay-Bold" }]}>
-          Unlock Video Generation
+          {isStepPhotos ? "Unlock Step Photos" : "Unlock Video Generation"}
         </Text>
         <Text style={[styles.subtitle, { fontFamily: "Inter" }]}>
-          Transform your recipes into beautiful step-by-step cooking tutorials
+          {isStepPhotos 
+            ? "Generate beautiful AI photos for each cooking step"
+            : "Transform your recipes into beautiful step-by-step cooking tutorials"}
         </Text>
 
         {/* Features */}
@@ -180,7 +224,7 @@ export default function PaywallScreen() {
 
         {/* Pricing Options */}
         <View style={styles.pricingContainer}>
-          {PRICING_OPTIONS.map((option) => (
+          {(isStepPhotos ? STEP_PHOTOS_PRICING_OPTIONS : VIDEO_PRICING_OPTIONS).map((option) => (
             <TouchableOpacity
               key={option.id}
               style={[

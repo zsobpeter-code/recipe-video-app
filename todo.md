@@ -251,3 +251,29 @@
 - [x] No paywall required - FREE to use
 - [x] Shows dish name subtitle in cook mode
 - [x] Hides scene description (video-only feature)
+
+## Feature: Cook Mode Redesign & Step Photo Generation
+
+### Cook Mode Screen
+- [x] Create dedicated cook-mode.tsx screen (separate from video-player)
+- [x] Header: Close, "Cook Mode" title, Share icon
+- [x] Step image display with step badge and timer
+- [x] Recipe title and step indicator
+- [x] Scrollable step instructions
+- [x] Previous/Next navigation controls
+- [x] Bottom bar: [Save] [Photos $1.99] [Video $4.99]
+
+### Step Photo Generation Service
+- [x] Create stepPhotoService.ts
+- [x] Generate AI images for each cooking step
+- [x] Images saved via generateImage (uses built-in storage)
+- [ ] Store step_images in recipe record (pending tRPC endpoint)
+
+### Recipe Card Update
+- [x] Update bottom bar: [Save] [Cook] [Video $4.99]
+- [x] Cook button navigates to cook-mode.tsx (not video-player)
+
+### Photo Generation UI
+- [x] Show paywall for $1.99 step photos (separate pricing from video)
+- [x] Progress indicator during generation (step-photo-generation.tsx)
+- [x] Display generated step photos in Cook Mode (via stepImages param)

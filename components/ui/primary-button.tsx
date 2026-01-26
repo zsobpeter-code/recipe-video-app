@@ -4,6 +4,7 @@ import { Platform } from "react-native";
 
 export interface PrimaryButtonProps {
   title: string;
+  subtitle?: string;
   onPress: () => void;
   disabled?: boolean;
   loading?: boolean;
@@ -14,6 +15,7 @@ export interface PrimaryButtonProps {
 
 export function PrimaryButton({
   title,
+  subtitle,
   onPress,
   disabled = false,
   loading = false,
@@ -45,7 +47,10 @@ export function PrimaryButton({
       ) : (
         <View style={styles.content}>
           {icon && <View style={styles.icon}>{icon}</View>}
-          <Text style={styles.text}>{title}</Text>
+          <View style={styles.textContainer}>
+            <Text style={styles.text}>{title}</Text>
+            {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+          </View>
         </View>
       )}
     </TouchableOpacity>
@@ -80,5 +85,14 @@ const styles = StyleSheet.create({
     fontFamily: "Inter-Medium",
     fontSize: 16,
     color: "#1A1A1A",
+  },
+  textContainer: {
+    alignItems: "center",
+  },
+  subtitle: {
+    fontFamily: "Inter",
+    fontSize: 11,
+    color: "rgba(26, 26, 26, 0.7)",
+    marginTop: 2,
   },
 });
