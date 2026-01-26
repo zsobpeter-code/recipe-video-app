@@ -348,6 +348,22 @@ export default function CookModeScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
     
+    // Check if we have an HTTPS image for video generation
+    const hasHttpsImage = params.imageUri?.startsWith("https://") || params.stepImages;
+    
+    if (!hasHttpsImage && !hasVideos) {
+      // No HTTPS image available - prompt user to generate step photos first
+      Alert.alert(
+        "AI Photo Required",
+        "Video generation requires AI-generated photos. Would you like to generate step photos first?",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Generate Photos", onPress: handlePhotos },
+        ]
+      );
+      return;
+    }
+    
     // If videos are already cached, go directly to video player
     if (hasVideos) {
       router.push({
@@ -359,6 +375,7 @@ export default function CookModeScreen() {
           cachedStepVideos: params.stepVideos,
           userId: params.userId,
           recipeId: params.recipeId,
+          stepImages: params.stepImages, // Pass step images with HTTPS URLs
         },
       });
       return;
@@ -374,6 +391,7 @@ export default function CookModeScreen() {
         imageUri: params.imageUri,
         userId: params.userId,
         recipeId: params.recipeId,
+        stepImages: params.stepImages, // Pass step images with HTTPS URLs
       },
     });
   };

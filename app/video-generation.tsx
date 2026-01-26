@@ -30,6 +30,7 @@ export default function VideoGenerationScreen() {
     userId?: string;
     recipeId?: string;
     cachedStepVideos?: string; // JSON string of existing step videos
+    stepImages?: string; // JSON string of step images with HTTPS URLs
   }>();
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -235,12 +236,62 @@ export default function VideoGenerationScreen() {
           setStepVideos([...generatedVideos]);
 
           try {
+            // Get image URL for this step
+            // Priority: step-specific image > main recipe image (must be HTTPS)
+            let stepImageUrl = params.imageUri || "";
+            
+            // Try to get step-specific image from stepImages
+            if (params.stepImages) {
+              try {
+                const stepImagesArray = JSON.parse(params.stepImages);
+                const stepImage = stepImagesArray.find((img: any) => img.stepIndex === i);
+                if (stepImage?.imageUrl && stepImage.imageUrl.startsWith("https://")) {
+                  stepImageUrl = stepImage.imageUrl;
+                  console.log(`[VideoGeneration] Using step ${i + 1} image:`, stepImageUrl.substring(0, 80));
+                }
+              } catch (e) {
+                console.error("[VideoGeneration] Failed to parse stepImages:", e);
+              }
+            }
+            
+            // Validate that we have an HTTPS URL
+            if (!stepImageUrl.startsWith("https://")) {
+              console.warn(`[VideoGeneration] Step ${i + 1} image is not HTTPS:`, stepImageUrl.substring(0, 50));
+              
+              // Try to use any HTTPS URL from stepImages as fallback
+              if (params.stepImages) {
+                try {
+                  const stepImagesArray = JSON.parse(params.stepImages);
+                  const anyHttpsImage = stepImagesArray.find((img: any) => img.imageUrl?.startsWith("https://"));
+                  if (anyHttpsImage) {
+                    stepImageUrl = anyHttpsImage.imageUrl;
+                    console.log(`[VideoGeneration] Using fallback HTTPS image from stepImages:`, stepImageUrl.substring(0, 80));
+                  }
+                } catch (e) {
+                  // Ignore
+                }
+              }
+              
+              // If still not HTTPS, skip this step with error
+              if (!stepImageUrl.startsWith("https://")) {
+                console.error(`[VideoGeneration] No HTTPS image available for step ${i + 1}. Video generation requires an AI-generated image or uploaded image.`);
+                generatedVideos[i] = {
+                  stepIndex: i,
+                  videoUrl: "",
+                  status: "failed",
+                  error: "No HTTPS image available. Please generate an AI photo first.",
+                };
+                setStepVideos([...generatedVideos]);
+                continue; // Skip to next step
+              }
+            }
+            
             // Call Runway API to generate video and store in Supabase
             const result = await generateStepVideoMutation.mutateAsync({
               userId: params.userId || "anonymous",
               recipeId: params.recipeId || `temp_${Date.now()}`,
               dishName: params.dishName || "Recipe",
-              imageUrl: params.imageUri || "",
+              imageUrl: stepImageUrl,
               stepInstruction: step.instruction,
               stepNumber: step.stepNumber,
             });

@@ -61,6 +61,7 @@ export default function RecipeCardScreen() {
     recipeId?: string; // If viewing an existing recipe
     userId?: string; // User ID for storage
     stepVideos?: string; // JSON string of cached step videos
+    stepImages?: string; // JSON string of step images with HTTPS URLs
   }>();
 
   // Parse JSON params
@@ -305,6 +306,22 @@ export default function RecipeCardScreen() {
     // This ensures text recipe photos are replaced with AI-generated food images
     const videoImageUri = generatedPhotoUri || displayImageUri;
     
+    // Check if we have an HTTPS image for video generation
+    const hasHttpsImage = videoImageUri?.startsWith("https://") || params.stepImages;
+    
+    if (!hasHttpsImage && !hasVideos) {
+      // No HTTPS image available - prompt user to generate AI photo first
+      Alert.alert(
+        "AI Photo Required",
+        "Video generation requires an AI-generated photo. Would you like to generate one now?",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Generate Photo", onPress: handleGenerateAIPhoto },
+        ]
+      );
+      return;
+    }
+    
     const recipeDataStr = JSON.stringify({
       dishName: params.dishName,
       description: params.description,
@@ -325,6 +342,7 @@ export default function RecipeCardScreen() {
           cachedStepVideos: params.stepVideos,
           userId: params.userId || "anonymous",
           recipeId: savedRecipeId || params.recipeId || `temp_${Date.now()}`,
+          stepImages: params.stepImages, // Pass step images with HTTPS URLs
         },
       });
       return;
@@ -341,6 +359,7 @@ export default function RecipeCardScreen() {
         hasGeneratedPhoto: generatedPhotoUri ? "true" : "false",
         userId: params.userId || "anonymous",
         recipeId: savedRecipeId || params.recipeId || `temp_${Date.now()}`,
+        stepImages: params.stepImages, // Pass step images with HTTPS URLs
       },
     });
   };

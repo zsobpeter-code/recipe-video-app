@@ -94,6 +94,7 @@ export default function PaywallScreen() {
     productType?: string; // "video" or "step_photos"
     recipeId?: string;
     userId?: string;
+    stepImages?: string; // JSON string of step images with HTTPS URLs
   }>();
 
   const isStepPhotos = params.productType === "step_photos";
@@ -147,6 +148,7 @@ export default function PaywallScreen() {
           imageUri: params.imageUri,
           userId: params.userId || "anonymous",
           recipeId: params.recipeId || `temp_${Date.now()}`,
+          stepImages: params.stepImages, // Pass step images with HTTPS URLs
         },
       });
     } else {
