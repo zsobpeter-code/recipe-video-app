@@ -6,6 +6,7 @@ import { publicProcedure, router } from "./_core/trpc";
 import { invokeLLM } from "./_core/llm";
 import { storagePut } from "./storage";
 import { generateImage } from "./_core/imageGeneration";
+import { enrichRecipeForVideo, type EnrichedStep } from "./videoPromptEnricher";
 
 // Recipe analysis response schema
 const recipeSchema = z.object({
@@ -56,7 +57,8 @@ export interface SavedRecipe {
   ingredients: string; // JSON string
   steps: string; // JSON string
   tags: string | null; // JSON string
-  imageUrl: string | null;
+  imageUrl: string | null; // AI-generated or main display image
+  originalImageUrl: string | null; // Original captured/uploaded image (e.g., handwritten recipe)
   isFavorite: boolean;
   createdAt: string;
   updatedAt: string;
@@ -223,7 +225,8 @@ Always return your response as valid JSON matching this exact structure:
         ingredients: z.string(), // JSON string
         steps: z.string(), // JSON string
         tags: z.string().optional(), // JSON string
-        imageUrl: z.string().optional(),
+        imageUrl: z.string().optional(), // AI-generated or main display image
+        originalImageUrl: z.string().optional(), // Original captured image (e.g., handwritten recipe)
       }))
       .mutation(async ({ input }) => {
         try {
@@ -245,6 +248,7 @@ Always return your response as valid JSON matching this exact structure:
             steps: input.steps,
             tags: input.tags || null,
             imageUrl: input.imageUrl || null,
+            originalImageUrl: input.originalImageUrl || null,
             isFavorite: false,
             createdAt: now,
             updatedAt: now,
@@ -414,6 +418,37 @@ Always return your response as valid JSON matching this exact structure:
             success: false,
             error: error instanceof Error ? error.message : "Failed to generate image",
             imageUrl: null,
+          };
+        }
+      }),
+
+    // Enrich recipe steps with visual prompts for video generation
+    enrichForVideo: publicProcedure
+      .input(z.object({
+        title: z.string().describe("Recipe title/dish name"),
+        steps: z.array(z.object({
+          stepNumber: z.number(),
+          instruction: z.string(),
+          duration: z.number().optional(),
+        })).describe("Recipe steps to enrich"),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          const enrichedSteps = await enrichRecipeForVideo({
+            title: input.title,
+            steps: input.steps,
+          });
+
+          return {
+            success: true,
+            enrichedSteps,
+          };
+        } catch (error) {
+          console.error("Video enrichment error:", error);
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to enrich video prompts",
+            enrichedSteps: null,
           };
         }
       }),

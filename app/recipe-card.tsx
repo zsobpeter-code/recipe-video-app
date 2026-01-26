@@ -90,16 +90,14 @@ export default function RecipeCardScreen() {
   const [isSaved, setIsSaved] = useState(!!params.recipeId);
   const [isGeneratingPhoto, setIsGeneratingPhoto] = useState(false);
   const [generatedPhotoUri, setGeneratedPhotoUri] = useState<string | null>(null);
+  const [showOriginalImage, setShowOriginalImage] = useState(false); // Toggle between original and AI-generated
+  const [isFavorite, setIsFavorite] = useState(false); // Favorite status
+  const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
   
-  // Check if we have a food photo or just text recipe
-  // We show the "Generate AI Photo" button when:
-  // 1. No image at all
-  // 2. Image is a placeholder
-  // 3. User hasn't already generated an AI photo
-  // The button allows users to generate a beautiful AI food photo for any recipe
-  const hasValidFoodPhoto = !!params.imageUri && 
-                            !params.imageUri.includes("placeholder") && 
-                            params.imageUri.length > 0;
+  // Check if we have both original and generated images (for toggle)
+  const hasOriginalImage = !!params.imageUri && params.imageUri.length > 0;
+  const hasGeneratedImage = !!generatedPhotoUri;
+  const canToggleImages = hasOriginalImage && hasGeneratedImage;
   
   // Animation values
   const ingredientsHeight = useSharedValue(1);
@@ -109,6 +107,53 @@ export default function RecipeCardScreen() {
   const uploadImage = trpc.recipe.uploadImage.useMutation();
   const saveRecipe = trpc.recipe.save.useMutation();
   const generateAIImage = trpc.recipe.generateImage.useMutation();
+  const toggleFavoriteMutation = trpc.recipe.toggleFavorite.useMutation();
+
+  const handleToggleFavorite = async () => {
+    // Only allow toggling if recipe is saved
+    if (!params.recipeId) {
+      Alert.alert(
+        "Save First",
+        "Please save this recipe to your collection before adding it to favorites.",
+        [{ text: "OK" }]
+      );
+      return;
+    }
+
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+
+    setIsTogglingFavorite(true);
+
+    try {
+      const result = await toggleFavoriteMutation.mutateAsync({ id: params.recipeId });
+      
+      if (result.success) {
+        setIsFavorite(result.isFavorite ?? !isFavorite);
+        
+        if (Platform.OS !== "web") {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+      } else {
+        throw new Error(result.error || "Failed to update favorite");
+      }
+    } catch (error) {
+      console.error("Toggle favorite error:", error);
+      
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
+      
+      Alert.alert(
+        "Error",
+        "Unable to update favorite status. Please try again.",
+        [{ text: "OK" }]
+      );
+    } finally {
+      setIsTogglingFavorite(false);
+    }
+  };
 
   const handleGenerateAIPhoto = async () => {
     if (Platform.OS !== "web") {
@@ -158,7 +203,15 @@ export default function RecipeCardScreen() {
   };
 
   // Use generated photo if available, otherwise original
-  const displayImageUri = generatedPhotoUri || params.imageUri;
+  // When user toggles, show the original image instead
+  const displayImageUri = showOriginalImage ? params.imageUri : (generatedPhotoUri || params.imageUri);
+  
+  const handleToggleImage = () => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    setShowOriginalImage(!showOriginalImage);
+  };
 
   const toggleSection = (section: "ingredients" | "steps") => {
     if (Platform.OS !== "web") {
@@ -237,9 +290,10 @@ export default function RecipeCardScreen() {
     setIsSaving(true);
     
     try {
+      let originalImageUrl: string | undefined;
       let imageUrl: string | undefined;
       
-      // Upload image if we have one
+      // Upload original image if we have one (the captured/uploaded image)
       if (params.imageUri) {
         let imageBase64 = "";
         
@@ -264,12 +318,20 @@ export default function RecipeCardScreen() {
         
         const uploadResult = await uploadImage.mutateAsync({
           imageBase64,
-          fileName: `${params.dishName?.replace(/\s+/g, "-") || "recipe"}.jpg`,
+          fileName: `${params.dishName?.replace(/\s+/g, "-") || "recipe"}-original.jpg`,
         });
         
         if (uploadResult.success && uploadResult.url) {
-          imageUrl = uploadResult.url;
+          originalImageUrl = uploadResult.url;
         }
+      }
+      
+      // If we have a generated AI photo, use that as the main display image
+      // Otherwise, use the original image as the main display
+      if (generatedPhotoUri) {
+        imageUrl = generatedPhotoUri; // AI-generated images are already URLs
+      } else {
+        imageUrl = originalImageUrl; // Use original as main display if no AI photo
       }
       
       // Determine category based on cuisine/tags
@@ -285,7 +347,7 @@ export default function RecipeCardScreen() {
         category = "Appetizer";
       }
       
-      // Save recipe
+      // Save recipe with both original and display images
       const saveResult = await saveRecipe.mutateAsync({
         dishName: params.dishName || "Untitled Recipe",
         description: params.description || "",
@@ -298,7 +360,8 @@ export default function RecipeCardScreen() {
         ingredients: params.ingredients || "[]",
         steps: params.steps || "[]",
         tags: params.tags || undefined,
-        imageUrl,
+        imageUrl, // Main display image (AI-generated if available)
+        originalImageUrl, // Original captured/uploaded image
       });
       
       if (saveResult.success) {
@@ -363,34 +426,23 @@ export default function RecipeCardScreen() {
           style={styles.vignette}
         />
         
-        {/* Generate AI Photo button - shown when user wants to generate/regenerate */}
-        {!generatedPhotoUri && (
+        {/* Image toggle button - shown when both original and generated images exist */}
+        {canToggleImages && (
           <TouchableOpacity
-            style={styles.generatePhotoButton}
-            onPress={handleGenerateAIPhoto}
-            disabled={isGeneratingPhoto}
+            style={styles.imageToggleButton}
+            onPress={handleToggleImage}
             activeOpacity={0.8}
           >
-            <LinearGradient
-              colors={["rgba(201,169,98,0.9)", "rgba(168,139,74,0.9)"]}
-              style={styles.generatePhotoGradient}
-            >
-              {isGeneratingPhoto ? (
-                <>
-                  <ActivityIndicator size="small" color="#1A1A1A" />
-                  <Text style={[styles.generatePhotoText, { fontFamily: "Inter-Medium" }]}>
-                    Generating...
-                  </Text>
-                </>
-              ) : (
-                <>
-                  <IconSymbol name="sparkles" size={20} color="#1A1A1A" />
-                  <Text style={[styles.generatePhotoText, { fontFamily: "Inter-Medium" }]}>
-                    Generate AI Photo
-                  </Text>
-                </>
-              )}
-            </LinearGradient>
+            <View style={styles.imageToggleInner}>
+              <IconSymbol 
+                name={showOriginalImage ? "sparkles" : "doc.text.fill"} 
+                size={16} 
+                color="#FFFFFF" 
+              />
+              <Text style={[styles.imageToggleText, { fontFamily: "Inter-Medium" }]}>
+                {showOriginalImage ? "View AI Photo" : "View Original"}
+              </Text>
+            </View>
           </TouchableOpacity>
         )}
       </View>
@@ -405,10 +457,16 @@ export default function RecipeCardScreen() {
           <IconSymbol name="chevron.left" size={24} color="#FFFFFF" />
         </TouchableOpacity>
         <TouchableOpacity 
-          style={styles.headerButton}
+          style={[styles.headerButton, isTogglingFavorite && { opacity: 0.5 }]}
+          onPress={handleToggleFavorite}
+          disabled={isTogglingFavorite}
           activeOpacity={0.7}
         >
-          <IconSymbol name="heart.fill" size={22} color="#C9A962" />
+          <IconSymbol 
+            name={isFavorite ? "heart.fill" : "heart"} 
+            size={22} 
+            color={isFavorite ? "#C9A962" : "#FFFFFF"} 
+          />
         </TouchableOpacity>
       </View>
 
@@ -432,6 +490,37 @@ export default function RecipeCardScreen() {
               {params.description || "A wonderful dish to enjoy"}
             </Text>
           </View>
+
+          {/* Generate AI Photo button - in scroll flow */}
+          {!generatedPhotoUri && (
+            <TouchableOpacity
+              style={styles.generatePhotoButtonInline}
+              onPress={handleGenerateAIPhoto}
+              disabled={isGeneratingPhoto}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={["rgba(201,169,98,0.9)", "rgba(168,139,74,0.9)"]}
+                style={styles.generatePhotoGradient}
+              >
+                {isGeneratingPhoto ? (
+                  <>
+                    <ActivityIndicator size="small" color="#1A1A1A" />
+                    <Text style={[styles.generatePhotoText, { fontFamily: "Inter-Medium" }]}>
+                      Generating...
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <IconSymbol name="sparkles" size={20} color="#1A1A1A" />
+                    <Text style={[styles.generatePhotoText, { fontFamily: "Inter-Medium" }]}>
+                      Generate AI Photo
+                    </Text>
+                  </>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
 
           {/* Tags */}
           {tags.length > 0 && (
@@ -639,6 +728,11 @@ const styles = StyleSheet.create({
     transform: [{ translateX: -80 }, { translateY: -24 }],
     zIndex: 5,
   },
+  generatePhotoButtonInline: {
+    alignSelf: "center",
+    marginTop: 12,
+    marginBottom: 4,
+  },
   generatePhotoGradient: {
     flexDirection: "row",
     alignItems: "center",
@@ -650,6 +744,27 @@ const styles = StyleSheet.create({
   generatePhotoText: {
     fontSize: 15,
     color: "#1A1A1A",
+  },
+  imageToggleButton: {
+    position: "absolute",
+    bottom: 100,
+    alignSelf: "center",
+    zIndex: 5,
+  },
+  imageToggleInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
+  },
+  imageToggleText: {
+    fontSize: 13,
+    color: "#FFFFFF",
   },
   vignette: {
     ...StyleSheet.absoluteFillObject,

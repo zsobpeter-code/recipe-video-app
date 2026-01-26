@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { 
   View, 
   Text, 
@@ -12,6 +12,7 @@ import * as Haptics from "expo-haptics";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { trpc } from "@/lib/trpc";
 
 const GENERATION_STEPS = [
   { id: 1, label: "Analyzing recipe structure", duration: 2000 },
@@ -32,6 +33,15 @@ export default function VideoGenerationScreen() {
   const [currentStep, setCurrentStep] = useState(0);
   const [progress, setProgress] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
+  const [enrichedSteps, setEnrichedSteps] = useState<Array<{
+    stepNumber: number;
+    originalText: string;
+    visualPrompt: string;
+    duration: number;
+  }> | null>(null);
+
+  // tRPC mutation for video enrichment
+  const enrichForVideoMutation = trpc.recipe.enrichForVideo.useMutation();
 
   // Animations
   const spinValue = useRef(new Animated.Value(0)).current;
@@ -74,6 +84,46 @@ export default function VideoGenerationScreen() {
     return () => pulse.stop();
   }, [pulseValue]);
 
+  // Call enrichForVideo API on mount
+  useEffect(() => {
+    const enrichVideo = async () => {
+      if (!params.recipeData) return;
+      
+      try {
+        const recipeData = JSON.parse(params.recipeData);
+        const steps = recipeData.steps || [];
+        
+        // Parse steps - handle both string array and Step object array
+        const parsedSteps = steps.map((step: unknown, index: number) => {
+          if (typeof step === "string") {
+            return { stepNumber: index + 1, instruction: step };
+          }
+          const stepObj = step as Record<string, unknown>;
+          return {
+            stepNumber: typeof stepObj.stepNumber === "number" ? stepObj.stepNumber : index + 1,
+            instruction: typeof stepObj.instruction === "string" ? stepObj.instruction : String(stepObj.instruction || `Step ${index + 1}`),
+            duration: typeof stepObj.duration === "number" ? stepObj.duration : undefined,
+          };
+        });
+        
+        const result = await enrichForVideoMutation.mutateAsync({
+          title: params.dishName || "Recipe",
+          steps: parsedSteps,
+        });
+        
+        if (result.success && result.enrichedSteps) {
+          setEnrichedSteps(result.enrichedSteps);
+          console.log("Video prompts enriched:", result.enrichedSteps);
+        }
+      } catch (error) {
+        console.error("Failed to enrich video prompts:", error);
+        // Continue without enriched prompts - fallback will be used
+      }
+    };
+    
+    enrichVideo();
+  }, [params.recipeData, params.dishName]);
+
   // Progress through steps
   useEffect(() => {
     let stepIndex = 0;
@@ -95,6 +145,7 @@ export default function VideoGenerationScreen() {
               dishName: params.dishName,
               recipeData: params.recipeData,
               imageUri: params.imageUri,
+              enrichedSteps: enrichedSteps ? JSON.stringify(enrichedSteps) : undefined,
             },
           });
         }, 1000);
@@ -134,7 +185,7 @@ export default function VideoGenerationScreen() {
     };
 
     processStep();
-  }, [params.dishName, params.recipeData, params.imageUri, progressValue, router]);
+  }, [params.dishName, params.recipeData, params.imageUri, progressValue, router, enrichedSteps]);
 
   const spin = spinValue.interpolate({
     inputRange: [0, 1],

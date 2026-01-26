@@ -47,6 +47,13 @@ const STEP_VISUALS = [
   { scale: [1.02, 1.12], translateX: [-5, 5], translateY: [0, 8], overlay: "rgba(201,169,98,0.05)" },
 ];
 
+interface EnrichedStep {
+  stepNumber: number;
+  originalText: string;
+  visualPrompt: string;
+  duration: number;
+}
+
 export default function VideoPlayerScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -54,12 +61,14 @@ export default function VideoPlayerScreen() {
     dishName?: string;
     recipeData?: string;
     imageUri?: string;
+    enrichedSteps?: string; // JSON string of enriched visual prompts
   }>();
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [steps, setSteps] = useState<RecipeStep[]>([]);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [enrichedSteps, setEnrichedSteps] = useState<EnrichedStep[]>([]);
   
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stepsScrollRef = useRef<ScrollView>(null);
@@ -69,6 +78,19 @@ export default function VideoPlayerScreen() {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const overlayOpacity = useSharedValue(0);
+
+  // Parse enriched steps if available
+  useEffect(() => {
+    if (params.enrichedSteps) {
+      try {
+        const parsed = JSON.parse(params.enrichedSteps) as EnrichedStep[];
+        setEnrichedSteps(parsed);
+        console.log("Loaded enriched video prompts:", parsed.length, "steps");
+      } catch (error) {
+        console.error("Failed to parse enriched steps:", error);
+      }
+    }
+  }, [params.enrichedSteps]);
 
   // Parse recipe data
   useEffect(() => {
@@ -442,6 +464,20 @@ export default function VideoPlayerScreen() {
         <Text style={[styles.currentStepText, { fontFamily: "PlayfairDisplay-Bold" }]}>
           {currentStep?.instruction || "Loading..."}
         </Text>
+        {/* Show enriched visual prompt if available */}
+        {enrichedSteps[currentStepIndex]?.visualPrompt && (
+          <View style={styles.visualPromptContainer}>
+            <View style={styles.visualPromptHeader}>
+              <IconSymbol name="video.fill" size={12} color="#C9A962" />
+              <Text style={[styles.visualPromptLabel, { fontFamily: "Inter-Medium" }]}>
+                Scene Description
+              </Text>
+            </View>
+            <Text style={[styles.visualPromptText, { fontFamily: "Inter" }]}>
+              {enrichedSteps[currentStepIndex].visualPrompt}
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Navigation Controls - Single play/pause button here */}
@@ -706,6 +742,32 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: "#FFFFFF",
     lineHeight: 28,
+  },
+  visualPromptContainer: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: "rgba(201,169,98,0.1)",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(201,169,98,0.2)",
+  },
+  visualPromptHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 6,
+  },
+  visualPromptLabel: {
+    fontSize: 10,
+    color: "#C9A962",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+  visualPromptText: {
+    fontSize: 13,
+    color: "#AAAAAA",
+    lineHeight: 18,
+    fontStyle: "italic",
   },
   navigationControls: {
     flexDirection: "row",

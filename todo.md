@@ -177,3 +177,30 @@
 ### BUG 5: No Generate AI Photo option after recipe loads
 - [x] Show Generate AI Photo button for all recipes (not just text)
 - [x] Button appears on Recipe Card allowing users to generate AI food images anytime
+
+## Bug Fixes (Round 5) - User Testing Feedback
+
+### BUG 1: Generated AI Photo Not Saved (HIGH)
+- [x] Add original_image_url field to SavedRecipe interface
+- [x] Save BOTH original image and AI-generated image when saving recipe
+- [x] Add toggle button to view original vs generated image in recipe detail
+- [x] Show original image as default if no AI photo generated
+
+### BUG 2: Generate AI Photo Button Position (MEDIUM)
+- [x] Added inline Generate AI Photo button in scroll flow
+- [x] Button placed after description, before tags/ingredients
+- [x] Button scrolls with content
+
+### BUG 3: Favorites Heart Icon Not Working (HIGH)
+- [x] Connect heart icon onPress handler
+- [x] Implement toggleFavorite tRPC mutation call
+- [x] Update local state after successful save
+- [x] Heart fills gold when favorited, outline (white) when not
+- [x] Recipe appears/disappears from favorites filter (via server-side toggle)
+
+### BUG 4: Video Generation Shows Static Image Only (HIGH)
+- [x] Create videoPromptEnricher service
+- [x] Transform recipe steps into rich visual prompts using Claude
+- [x] Include camera angles, lighting, motion descriptions
+- [x] Pass enriched prompts to video player via navigation params
+- [x] Show visual prompt preview in video player (Scene Description panel)
