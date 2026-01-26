@@ -296,3 +296,26 @@
 - [x] Removed "Untitled Dish" default from input-details.tsx
 - [x] Claude now instructed to never use generic names like "Untitled Dish"
 - [ ] Apply fix in recipe recognition flow
+
+## Bug Fixes (Round 9) - Cook Mode & Recipe Detail UX
+
+### Problem 1: Instructions Hard to Access on Recipe Detail
+- [x] Make Instructions section expanded by default (changed from ingredients)
+- [x] Reduce hero image height to max 200-240px
+- [x] Instructions now prominent and easily scrollable
+
+### Problem 2: Cook Mode Image Takes Too Much Space
+- [x] Convert hero image to subtle blurred background (opacity 0.3, blur 15)
+- [x] Add dark overlay for text readability (60% black)
+- [x] Focus layout on instruction text and ingredients
+- [x] Make instruction text large and readable (22px PlayfairDisplay)
+
+### Problem 3: Redundant Badges on Image
+- [x] Removed "Step X of Y" badge from image
+- [x] Removed timer badge from image - now inline tappable timer
+- [x] Keep only text-based step counter below title
+
+### Problem 4: Can't Save Recipe After Photo Generation
+- [x] Fixed: Properly format ingredients/steps as JSON strings
+- [x] Fixed: Handle both string and object types for nested data
+- [x] Added detailed error logging for debugging

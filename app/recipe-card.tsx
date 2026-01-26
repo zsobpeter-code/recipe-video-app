@@ -85,7 +85,7 @@ export default function RecipeCardScreen() {
     };
   });
 
-  const [expandedSection, setExpandedSection] = useState<"ingredients" | "steps" | null>("ingredients");
+  const [expandedSection, setExpandedSection] = useState<"ingredients" | "steps" | null>("steps");
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(!!params.recipeId);
   const [savedRecipeId, setSavedRecipeId] = useState<string | null>(params.recipeId || null);
@@ -510,7 +510,7 @@ export default function RecipeCardScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Spacer for image */}
-        <View style={{ height: SCREEN_WIDTH * 0.7 }} />
+        <View style={{ height: Math.min(SCREEN_WIDTH * 0.5, 200) }} />
 
         {/* Main info card */}
         <GlassmorphismCard className="mx-4 gap-4">
@@ -743,7 +743,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: SCREEN_WIDTH,
+    height: Math.min(SCREEN_WIDTH * 0.6, 240),
   },
   backgroundImage: {
     width: "100%",

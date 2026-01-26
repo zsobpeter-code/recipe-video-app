@@ -15,7 +15,6 @@ import {
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
-// Removed animation imports - Cook Mode uses static images
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenContainer } from "@/components/screen-container";
@@ -24,7 +23,7 @@ import { PrimaryButton } from "@/components/ui/primary-button";
 import { SecondaryButton } from "@/components/ui/secondary-button";
 import { trpc } from "@/lib/trpc";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 interface RecipeStep {
   number: number;
@@ -63,9 +62,6 @@ export default function CookModeScreen() {
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isGeneratingPhotos, setIsGeneratingPhotos] = useState(false);
-  const [generationProgress, setGenerationProgress] = useState(0);
-  const [currentGeneratingStep, setCurrentGeneratingStep] = useState(0);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [showIngredientsModal, setShowIngredientsModal] = useState(false);
   
@@ -80,8 +76,6 @@ export default function CookModeScreen() {
     );
   };
 
-  // Static image mode - no animation values needed
-
   // tRPC mutations
   const saveMutation = trpc.recipe.save.useMutation();
 
@@ -92,73 +86,53 @@ export default function CookModeScreen() {
         const data = JSON.parse(params.recipeData);
         
         // Parse steps
-        if (data.steps) {
-          let parsedSteps: RecipeStep[];
-          if (typeof data.steps === "string") {
-            parsedSteps = JSON.parse(data.steps);
-          } else {
-            parsedSteps = data.steps;
-          }
-          
-          // Normalize steps
-          const normalizedSteps = parsedSteps.map((step: any, index: number) => ({
-            number: step.number || step.stepNumber || index + 1,
-            instruction: step.instruction || step.text || String(step),
-            duration: step.duration || step.time || "2 min",
-            durationSeconds: step.durationSeconds || step.seconds || 120,
-            imageUrl: step.imageUrl,
+        if (data.steps && Array.isArray(data.steps)) {
+          const parsedSteps = data.steps.map((step: any, index: number) => ({
+            number: step.stepNumber || index + 1,
+            instruction: step.instruction || step,
+            duration: step.duration ? `${step.duration} min` : "",
+            durationSeconds: (step.duration || 0) * 60,
           }));
-          setSteps(normalizedSteps);
+          setSteps(parsedSteps);
         }
         
         // Parse ingredients
-        if (data.ingredients) {
-          let parsedIngredients: Ingredient[];
-          if (typeof data.ingredients === "string") {
-            parsedIngredients = JSON.parse(data.ingredients);
-          } else {
-            parsedIngredients = data.ingredients;
-          }
-          
-          // Normalize ingredients
-          const normalizedIngredients = parsedIngredients.map((ing: any) => ({
-            name: ing.name || ing.ingredient || String(ing),
-            amount: ing.amount || ing.quantity || "",
+        if (data.ingredients && Array.isArray(data.ingredients)) {
+          const parsedIngredients = data.ingredients.map((ing: any) => ({
+            name: ing.name || ing,
+            amount: ing.amount || "",
             unit: ing.unit || "",
           }));
-          setIngredients(normalizedIngredients);
+          setIngredients(parsedIngredients);
         }
       } catch (e) {
         console.error("Failed to parse recipe data:", e);
       }
     }
-
-    // Parse step images if available
+    
+    // Parse step images
     if (params.stepImages) {
       try {
         const images = JSON.parse(params.stepImages);
-        setStepImages(images);
+        if (Array.isArray(images)) {
+          setStepImages(images);
+        }
       } catch (e) {
         console.error("Failed to parse step images:", e);
       }
     }
   }, [params.recipeData, params.stepImages]);
 
-  // Static image - no animation (removed Ken Burns effect)
-
-  // Timer logic
+  // Timer effect
   useEffect(() => {
     if (isTimerRunning) {
       timerRef.current = setInterval(() => {
         setElapsedTime(prev => prev + 1);
       }, 1000);
-    } else {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
+    } else if (timerRef.current) {
+      clearInterval(timerRef.current);
     }
-
+    
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
@@ -166,35 +140,19 @@ export default function CookModeScreen() {
     };
   }, [isTimerRunning]);
 
-  // Reset timer when step changes
-  useEffect(() => {
-    setElapsedTime(0);
-    setIsTimerRunning(false);
-  }, [currentStepIndex]);
-
-  // Static image - no animation style needed
-
-  const currentStep = steps[currentStepIndex];
-  
-  // Get image for current step
-  const getCurrentStepImage = () => {
-    // Check if this step has a generated image
-    const stepImage = stepImages.find(img => img.stepIndex === currentStepIndex);
-    if (stepImage?.imageUrl) {
-      return stepImage.imageUrl;
-    }
-    // Check if step has its own image
-    if (currentStep?.imageUrl) {
-      return currentStep.imageUrl;
-    }
-    // Fall back to recipe main image
-    return params.imageUri;
-  };
-
-  const formatTime = (seconds: number) => {
+  const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${String(secs).padStart(2, "0")}`;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const currentStep = steps[currentStepIndex];
+
+  // Get current step image
+  const getCurrentStepImage = (): string | undefined => {
+    const stepImg = stepImages.find(img => img.stepIndex === currentStepIndex);
+    if (stepImg) return stepImg.imageUrl;
+    return params.imageUri;
   };
 
   const handleClose = () => {
@@ -204,27 +162,13 @@ export default function CookModeScreen() {
     router.back();
   };
 
-  const handleShare = async () => {
-    if (Platform.OS !== "web") {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-    
-    try {
-      await Share.share({
-        message: `Check out this recipe: ${params.dishName || "Delicious Dish"}\n\nStep ${currentStepIndex + 1}: ${currentStep?.instruction || ""}`,
-        title: params.dishName || "Recipe",
-      });
-    } catch (error) {
-      console.error("Share error:", error);
-    }
-  };
-
   const handlePrevious = () => {
     if (currentStepIndex > 0) {
       if (Platform.OS !== "web") {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
       setCurrentStepIndex(currentStepIndex - 1);
+      setElapsedTime(0);
     }
   };
 
@@ -234,6 +178,7 @@ export default function CookModeScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
       setCurrentStepIndex(currentStepIndex + 1);
+      setElapsedTime(0);
     }
   };
 
@@ -245,34 +190,69 @@ export default function CookModeScreen() {
     }
     
     setIsSaving(true);
+    
     try {
       const recipeData = params.recipeData ? JSON.parse(params.recipeData) : {};
-      await saveMutation.mutateAsync({
-        dishName: params.dishName || "Untitled Recipe",
+      
+      // Ensure ingredients and steps are properly formatted
+      let ingredientsStr = "[]";
+      let stepsStr = "[]";
+      
+      if (recipeData.ingredients) {
+        ingredientsStr = typeof recipeData.ingredients === "string" 
+          ? recipeData.ingredients 
+          : JSON.stringify(recipeData.ingredients);
+      }
+      
+      if (recipeData.steps) {
+        stepsStr = typeof recipeData.steps === "string" 
+          ? recipeData.steps 
+          : JSON.stringify(recipeData.steps);
+      }
+      
+      // Build the save payload with proper types
+      const savePayload = {
+        dishName: params.dishName || "Recipe",
         description: recipeData.description || "",
         difficulty: recipeData.difficulty || "medium",
         prepTime: typeof recipeData.prepTime === "number" ? recipeData.prepTime : 10,
-        cookTime: typeof recipeData.cookTime === "number" ? recipeData.cookTime : 20,
-        servings: recipeData.servings || 4,
-        ingredients: typeof recipeData.ingredients === "string" 
-          ? recipeData.ingredients 
-          : JSON.stringify(recipeData.ingredients || []),
-        steps: typeof recipeData.steps === "string"
-          ? recipeData.steps
-          : JSON.stringify(recipeData.steps || []),
+        cookTime: typeof recipeData.cookTime === "number" ? recipeData.cookTime : 30,
+        servings: typeof recipeData.servings === "number" ? recipeData.servings : 4,
+        ingredients: ingredientsStr,
+        steps: stepsStr,
         imageUrl: params.imageUri || "",
-      });
+        cuisine: recipeData.cuisine || undefined,
+        tags: recipeData.tags ? (typeof recipeData.tags === "string" ? recipeData.tags : JSON.stringify(recipeData.tags)) : undefined,
+        category: "main",
+      };
+      
+      console.log("Saving recipe with payload:", JSON.stringify(savePayload, null, 2));
+      
+      const result = await saveMutation.mutateAsync(savePayload);
+      console.log("Save result:", result);
+      
       setIsSaved(true);
+      
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      
       Alert.alert("Saved!", "Recipe added to your collection.");
-    } catch (error) {
-      console.error("Save error:", error);
-      Alert.alert("Error", "Failed to save recipe. Please try again.");
+    } catch (error: any) {
+      console.error("Save error details:", {
+        message: error?.message,
+        code: error?.code,
+        data: error?.data,
+        shape: error?.shape,
+      });
+      const errorMessage = error?.message || "Failed to save recipe";
+      Alert.alert("Save Error", errorMessage);
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleGeneratePhotos = () => {
+  const handlePhotos = () => {
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
@@ -317,216 +297,169 @@ export default function CookModeScreen() {
   const stepImage = getCurrentStepImage();
 
   return (
-    <ScreenContainer 
-      edges={["top", "left", "right"]} 
-      containerClassName="bg-background"
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.headerButton}
-          onPress={handleClose}
-          activeOpacity={0.7}
-        >
-          <IconSymbol name="xmark" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-        <Text 
-          style={[styles.headerTitle, { fontFamily: "Inter-Medium" }]}
-          numberOfLines={1}
-        >
-          Cook Mode
-        </Text>
-        <TouchableOpacity 
-          style={styles.headerButton}
-          onPress={() => setShowIngredientsModal(true)}
-          activeOpacity={0.7}
-        >
-          <IconSymbol name="list.bullet" size={22} color="#FFFFFF" />
-        </TouchableOpacity>
-      </View>
-
-      {/* Step Image - Static */}
-      <View style={styles.imageContainer}>
-        {stepImage ? (
-          <View style={styles.imageWrapper}>
-            <Image
-              source={{ uri: stepImage }}
-              style={styles.stepImage}
-              contentFit="cover"
-            />
-          </View>
-        ) : (
-          <View style={styles.imagePlaceholder}>
-            <IconSymbol name="photo.fill" size={48} color="#555555" />
-          </View>
-        )}
-        
-        {/* Step Badge */}
-        <View style={styles.stepBadge}>
-          <Text style={[styles.stepBadgeText, { fontFamily: "Inter-Medium" }]}>
-            Step {currentStepIndex + 1} of {steps.length}
+    <View style={styles.container}>
+      {/* Background Image - Blurred and Subtle */}
+      {stepImage && (
+        <Image
+          source={{ uri: stepImage }}
+          style={styles.backgroundImage}
+          contentFit="cover"
+          blurRadius={15}
+        />
+      )}
+      
+      {/* Dark Overlay for Readability */}
+      <View style={styles.overlay} />
+      
+      {/* Content */}
+      <View style={[styles.content, { paddingTop: insets.top }]}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.headerButton}
+            onPress={handleClose}
+            activeOpacity={0.7}
+          >
+            <IconSymbol name="xmark" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <Text 
+            style={[styles.headerTitle, { fontFamily: "Inter-Medium" }]}
+            numberOfLines={1}
+          >
+            Cook Mode
           </Text>
+          <TouchableOpacity 
+            style={styles.headerButton}
+            onPress={() => setShowIngredientsModal(true)}
+            activeOpacity={0.7}
+          >
+            <IconSymbol name="list.bullet" size={22} color="#FFFFFF" />
+          </TouchableOpacity>
         </View>
-        
-        {/* Timer Badge */}
+
+        {/* Recipe Title */}
+        <Text 
+          style={[styles.recipeTitle, { fontFamily: "PlayfairDisplay-Bold" }]}
+          numberOfLines={2}
+        >
+          {params.dishName || "Recipe"}
+        </Text>
+
+        {/* Step Counter */}
+        <Text style={[styles.stepCounter, { fontFamily: "Inter-Medium" }]}>
+          STEP {currentStepIndex + 1} OF {steps.length}
+        </Text>
+
+        {/* Timer - Tappable */}
         <TouchableOpacity 
-          style={[styles.timerBadge, isTimerRunning && styles.timerBadgeActive]}
+          style={[styles.timerContainer, isTimerRunning && styles.timerContainerActive]}
           onPress={handleTimerToggle}
           activeOpacity={0.8}
         >
-          <IconSymbol name="clock.fill" size={14} color={isTimerRunning ? "#1A1A1A" : "#FFFFFF"} />
+          <IconSymbol name="clock.fill" size={16} color={isTimerRunning ? "#1A1A1A" : "#C9A962"} />
           <Text style={[
-            styles.timerBadgeText, 
+            styles.timerText, 
             { fontFamily: "Inter-Medium" },
-            isTimerRunning && styles.timerBadgeTextActive
+            isTimerRunning && styles.timerTextActive
           ]}>
             {formatTime(elapsedTime)}
           </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Recipe Title */}
-      <Text 
-        style={[styles.recipeTitle, { fontFamily: "PlayfairDisplay-Bold" }]}
-        numberOfLines={2}
-      >
-        {params.dishName || "Recipe"}
-      </Text>
-
-      {/* Step Indicator */}
-      <Text style={[styles.stepIndicator, { fontFamily: "Inter-Medium" }]}>
-        STEP {currentStepIndex + 1} OF {steps.length}
-      </Text>
-
-      {/* Step Instructions */}
-      <ScrollView 
-        style={styles.instructionContainer}
-        contentContainerStyle={styles.instructionContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <Text style={[styles.instructionText, { fontFamily: "Inter" }]}>
-          {currentStep?.instruction || "Loading..."}
-        </Text>
-        
-        {/* Step Duration */}
-        {currentStep?.duration && (
-          <View style={styles.durationRow}>
-            <IconSymbol name="clock.fill" size={14} color="#888888" />
-            <Text style={[styles.durationText, { fontFamily: "Inter" }]}>
-              {currentStep.duration}
-            </Text>
-          </View>
-        )}
-        
-        {/* Step-specific Ingredients */}
-        {currentStep && extractIngredientsForStep(currentStep.instruction).length > 0 && (
-          <View style={styles.stepIngredients}>
-            <Text style={[styles.stepIngredientsLabel, { fontFamily: "Inter-Medium" }]}>
-              Ingredients for this step:
-            </Text>
-            {extractIngredientsForStep(currentStep.instruction).map((ing, index) => (
-              <View key={index} style={styles.stepIngredientRow}>
-                <Text style={[styles.stepIngredientAmount, { fontFamily: "Inter-Medium" }]}>
-                  {ing.amount}{ing.unit ? ` ${ing.unit}` : ""}
-                </Text>
-                <Text style={[styles.stepIngredientName, { fontFamily: "Inter" }]}>
-                  {ing.name}
-                </Text>
-              </View>
-            ))}
-          </View>
-        )}
-      </ScrollView>
-
-      {/* Navigation Controls */}
-      <View style={styles.navControls}>
-        <TouchableOpacity
-          style={[styles.navButton, currentStepIndex === 0 && styles.navButtonDisabled]}
-          onPress={handlePrevious}
-          disabled={currentStepIndex === 0}
-          activeOpacity={0.7}
-        >
-          <IconSymbol 
-            name="backward.fill" 
-            size={20} 
-            color={currentStepIndex === 0 ? "#555555" : "#FFFFFF"} 
-          />
           <Text style={[
-            styles.navButtonText, 
+            styles.timerHint, 
             { fontFamily: "Inter" },
-            currentStepIndex === 0 && styles.navButtonTextDisabled
+            isTimerRunning && styles.timerHintActive
           ]}>
-            Previous
+            {isTimerRunning ? "Tap to pause" : "Tap to start"}
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.navButton, currentStepIndex === steps.length - 1 && styles.navButtonDisabled]}
-          onPress={handleNext}
-          disabled={currentStepIndex === steps.length - 1}
-          activeOpacity={0.7}
+        {/* Main Instruction - Large and Readable */}
+        <ScrollView 
+          style={styles.instructionScroll}
+          contentContainerStyle={styles.instructionContent}
+          showsVerticalScrollIndicator={false}
         >
-          <Text style={[
-            styles.navButtonText, 
-            { fontFamily: "Inter" },
-            currentStepIndex === steps.length - 1 && styles.navButtonTextDisabled
-          ]}>
-            Next
+          <Text style={[styles.instruction, { fontFamily: "PlayfairDisplay-Regular" }]}>
+            {currentStep?.instruction || "Loading..."}
           </Text>
-          <IconSymbol 
-            name="forward.fill" 
-            size={20} 
-            color={currentStepIndex === steps.length - 1 ? "#555555" : "#FFFFFF"} 
-          />
-        </TouchableOpacity>
-      </View>
-
-      {/* Bottom Action Bar */}
-      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
-        <SecondaryButton
-          title={isSaved ? "Saved" : "Save"}
-          onPress={handleSave}
-          icon={isSaving ? (
-            <ActivityIndicator size="small" color="#C9A962" />
-          ) : (
-            <IconSymbol name="bookmark.fill" size={16} color="#C9A962" />
-          )}
-          style={{ flex: 1, opacity: isSaving ? 0.7 : 1 }}
-          disabled={isSaving || isSaved}
-        />
-        <PrimaryButton
-          title="Photos"
-          subtitle="$1.99"
-          onPress={handleGeneratePhotos}
-          icon={<IconSymbol name="photo.fill" size={16} color="#1A1A1A" />}
-          style={{ flex: 1 }}
-        />
-        <SecondaryButton
-          title="Video"
-          subtitle="$4.99"
-          onPress={handleGenerateVideo}
-          icon={<IconSymbol name="video.fill" size={16} color="#C9A962" />}
-          style={{ flex: 1 }}
-        />
-      </View>
-
-      {/* Photo Generation Loading Overlay */}
-      {isGeneratingPhotos && (
-        <View style={styles.loadingOverlay}>
-          <View style={styles.loadingCard}>
-            <ActivityIndicator size="large" color="#C9A962" />
-            <Text style={[styles.loadingTitle, { fontFamily: "PlayfairDisplay-Bold" }]}>
-              Generating Step Photos
-            </Text>
-            <Text style={[styles.loadingText, { fontFamily: "Inter" }]}>
-              Step {currentGeneratingStep} of {steps.length}
-            </Text>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${generationProgress}%` }]} />
+          
+          {/* Step-specific Ingredients */}
+          {currentStep && extractIngredientsForStep(currentStep.instruction).length > 0 && (
+            <View style={styles.stepIngredients}>
+              {extractIngredientsForStep(currentStep.instruction).map((ing, index) => (
+                <Text key={index} style={[styles.ingredient, { fontFamily: "Inter" }]}>
+                  • {ing.amount}{ing.unit ? ` ${ing.unit}` : ""} {ing.name}
+                </Text>
+              ))}
             </View>
-          </View>
+          )}
+        </ScrollView>
+
+        {/* Navigation Controls */}
+        <View style={styles.navigation}>
+          <TouchableOpacity
+            style={[styles.navButton, currentStepIndex === 0 && styles.navButtonDisabled]}
+            onPress={handlePrevious}
+            disabled={currentStepIndex === 0}
+            activeOpacity={0.7}
+          >
+            <IconSymbol 
+              name="backward.fill" 
+              size={18} 
+              color={currentStepIndex === 0 ? "#555555" : "#FFFFFF"} 
+            />
+            <Text style={[
+              styles.navButtonText, 
+              { fontFamily: "Inter-Medium" },
+              currentStepIndex === 0 && styles.navButtonTextDisabled
+            ]}>
+              Previous
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.navButton, currentStepIndex === steps.length - 1 && styles.navButtonDisabled]}
+            onPress={handleNext}
+            disabled={currentStepIndex === steps.length - 1}
+            activeOpacity={0.7}
+          >
+            <Text style={[
+              styles.navButtonText, 
+              { fontFamily: "Inter-Medium" },
+              currentStepIndex === steps.length - 1 && styles.navButtonTextDisabled
+            ]}>
+              Next
+            </Text>
+            <IconSymbol 
+              name="forward.fill" 
+              size={18} 
+              color={currentStepIndex === steps.length - 1 ? "#555555" : "#FFFFFF"} 
+            />
+          </TouchableOpacity>
         </View>
-      )}
+
+        {/* Bottom Bar */}
+        <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          <SecondaryButton
+            title={isSaved ? "Saved" : "Save"}
+            onPress={handleSave}
+            disabled={isSaved || isSaving}
+            style={{ flex: 1 }}
+          />
+          <SecondaryButton
+            title="Photos"
+            subtitle="$1.99"
+            onPress={handlePhotos}
+            style={{ flex: 1 }}
+          />
+          <PrimaryButton
+            title="Video"
+            subtitle="$4.99"
+            onPress={handleGenerateVideo}
+            style={{ flex: 1 }}
+          />
+        </View>
+      </View>
 
       {/* Ingredients Modal */}
       <Modal
@@ -536,12 +469,12 @@ export default function CookModeScreen() {
         onRequestClose={() => setShowIngredientsModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
+          <View style={[styles.modalContainer, { paddingTop: insets.top + 20 }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { fontFamily: "PlayfairDisplay-Bold" }]}>
-                All Ingredients
+                Ingredients
               </Text>
-              <TouchableOpacity
+              <TouchableOpacity 
                 style={styles.modalCloseButton}
                 onPress={() => setShowIngredientsModal(false)}
                 activeOpacity={0.7}
@@ -549,7 +482,10 @@ export default function CookModeScreen() {
                 <IconSymbol name="xmark" size={20} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
-            <ScrollView style={styles.modalContent}>
+            <ScrollView 
+              style={styles.modalContent}
+              showsVerticalScrollIndicator={false}
+            >
               {ingredients.length > 0 ? (
                 ingredients.map((ing, index) => (
                   <View key={index} style={styles.ingredientItem}>
@@ -562,7 +498,7 @@ export default function CookModeScreen() {
                   </View>
                 ))
               ) : (
-                <Text style={[styles.loadingText, { fontFamily: "Inter", textAlign: "center", marginTop: 40 }]}>
+                <Text style={[styles.noIngredientsText, { fontFamily: "Inter" }]}>
                   No ingredients available
                 </Text>
               )}
@@ -570,11 +506,34 @@ export default function CookModeScreen() {
           </View>
         </View>
       </Modal>
-    </ScreenContainer>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#1A1A1A",
+  },
+  backgroundImage: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    opacity: 0.3,
+  },
+  overlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+  },
+  content: {
+    flex: 1,
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -597,104 +556,86 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginHorizontal: 16,
   },
-  imageContainer: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_WIDTH * 0.65,
-    overflow: "hidden",
-    position: "relative",
-  },
-  imageWrapper: {
-    width: "100%",
-    height: "100%",
-  },
-  stepImage: {
-    width: "100%",
-    height: "100%",
-  },
-  imagePlaceholder: {
-    width: "100%",
-    height: "100%",
-    backgroundColor: "#2A2A2A",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepBadge: {
-    position: "absolute",
-    top: 16,
-    left: 16,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  stepBadgeText: {
-    fontSize: 12,
+  recipeTitle: {
+    fontSize: 28,
     color: "#FFFFFF",
+    textAlign: "center",
+    paddingHorizontal: 24,
+    marginTop: 20,
   },
-  timerBadge: {
-    position: "absolute",
-    top: 16,
-    right: 16,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+  stepCounter: {
+    fontSize: 14,
+    color: "#C9A962",
+    textAlign: "center",
+    marginTop: 8,
+    letterSpacing: 2,
+  },
+  timerContainer: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 16,
+    alignSelf: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: "rgba(201, 169, 98, 0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(201, 169, 98, 0.3)",
   },
-  timerBadgeActive: {
+  timerContainerActive: {
     backgroundColor: "#C9A962",
+    borderColor: "#C9A962",
   },
-  timerBadgeText: {
-    fontSize: 12,
-    color: "#FFFFFF",
+  timerText: {
+    fontSize: 18,
+    color: "#C9A962",
   },
-  timerBadgeTextActive: {
+  timerTextActive: {
     color: "#1A1A1A",
   },
-  recipeTitle: {
-    fontSize: 24,
-    color: "#FFFFFF",
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 8,
+  timerHint: {
+    fontSize: 12,
+    color: "#888888",
+    marginLeft: 4,
   },
-  stepIndicator: {
-    fontSize: 11,
-    color: "#C9A962",
-    letterSpacing: 1,
-    paddingHorizontal: 20,
-    marginBottom: 8,
+  timerHintActive: {
+    color: "rgba(0, 0, 0, 0.6)",
   },
-  instructionContainer: {
+  instructionScroll: {
     flex: 1,
-    paddingHorizontal: 20,
+    marginTop: 24,
+    paddingHorizontal: 24,
   },
   instructionContent: {
     paddingBottom: 20,
   },
-  instructionText: {
-    fontSize: 18,
+  instruction: {
+    fontSize: 22,
     color: "#FFFFFF",
-    lineHeight: 28,
+    lineHeight: 34,
   },
-  durationRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 16,
+  stepIngredients: {
+    marginTop: 20,
+    padding: 16,
+    backgroundColor: "rgba(201, 169, 98, 0.15)",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(201, 169, 98, 0.3)",
   },
-  durationText: {
-    fontSize: 14,
-    color: "#888888",
+  ingredient: {
+    fontSize: 16,
+    color: "#C9A962",
+    marginVertical: 4,
+    lineHeight: 24,
   },
-  navControls: {
+  navigation: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
   },
   navButton: {
     flexDirection: "row",
@@ -707,7 +648,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   navButtonText: {
-    fontSize: 14,
+    fontSize: 15,
     color: "#FFFFFF",
   },
   navButtonTextDisabled: {
@@ -722,86 +663,13 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "rgba(255, 255, 255, 0.1)",
   },
-  loadingOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.85)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  loadingCard: {
-    backgroundColor: "#1A1A1A",
-    borderRadius: 20,
-    padding: 32,
-    alignItems: "center",
-    width: SCREEN_WIDTH - 64,
-    borderWidth: 1,
-    borderColor: "rgba(201, 169, 98, 0.3)",
-  },
-  loadingTitle: {
-    fontSize: 20,
-    color: "#FFFFFF",
-    marginTop: 20,
-    marginBottom: 8,
-  },
-  loadingText: {
-    fontSize: 14,
-    color: "#888888",
-    marginBottom: 20,
-  },
-  progressBar: {
-    width: "100%",
-    height: 6,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    borderRadius: 3,
-    overflow: "hidden",
-  },
-  progressFill: {
-    height: "100%",
-    backgroundColor: "#C9A962",
-    borderRadius: 3,
-  },
-  stepIngredients: {
-    marginTop: 20,
-    backgroundColor: "rgba(201, 169, 98, 0.1)",
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "rgba(201, 169, 98, 0.2)",
-  },
-  stepIngredientsLabel: {
-    fontSize: 13,
-    color: "#C9A962",
-    marginBottom: 12,
-    letterSpacing: 0.5,
-  },
-  stepIngredientRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 6,
-    gap: 12,
-  },
-  stepIngredientAmount: {
-    fontSize: 14,
-    color: "#C9A962",
-    minWidth: 70,
-  },
-  stepIngredientName: {
-    fontSize: 14,
-    color: "#FFFFFF",
-    flex: 1,
-  },
-  // Ingredients Modal styles
+  // Modal styles
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.9)",
   },
   modalContainer: {
     flex: 1,
-    paddingTop: 60,
   },
   modalHeader: {
     flexDirection: "row",
@@ -845,5 +713,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#FFFFFF",
     flex: 1,
+  },
+  noIngredientsText: {
+    fontSize: 16,
+    color: "#888888",
+    textAlign: "center",
+    marginTop: 40,
   },
 });
