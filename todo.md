@@ -345,3 +345,34 @@
 - Model: gen3a_turbo (faster, cheaper)
 - Duration: 5 seconds per step
 - Ratio: 9:16 (vertical)
+
+## Feature: Video Storage in Supabase
+
+### Phase 1: Database & Storage Setup
+- [x] Add step_videos JSONB column to recipes table
+- [x] Add video_generated_at TIMESTAMPTZ column
+- [x] Create recipe-videos storage bucket in Supabase
+- [x] Create storage policies for upload/view/delete
+
+### Phase 2: Video Generation Updates
+- [x] Update videoStorageService.ts with storeVideoToSupabase function
+- [x] Download video from Runway temp URL
+- [x] Upload to Supabase Storage (recipe-videos bucket)
+- [x] Add "saving" progress status during upload
+- [ ] Save step_videos array to recipe record (pending tRPC endpoint)
+
+### Phase 3: Video Player Updates
+- [x] Videos now stored permanently in Supabase Storage
+- [x] userId and recipeId passed through navigation chain
+- [x] Storage path: recipe-videos/{userId}/{recipeId}/step_{n}.mp4
+- [ ] Check if videos already exist before regenerating (future optimization)
+- [ ] Skip generation if step_videos already populated
+
+### Testing Checklist
+- [ ] Video generates via Runway API
+- [ ] Progress shows "saving" status during upload
+- [ ] Video appears in Supabase Storage bucket
+- [ ] Storage path is {userId}/{recipeId}/step_X.mp4
+- [ ] Recipe record has step_videos array with permanent URLs
+- [ ] Video player loads from Supabase URL
+- [ ] Re-opening recipe plays stored video without regenerating

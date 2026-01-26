@@ -500,6 +500,8 @@ Always return your response as valid JSON matching this exact structure:
     // Generate AI video for a single cooking step using Runway API
     generateStepVideo: publicProcedure
       .input(z.object({
+        userId: z.string().describe("User ID for storage path"),
+        recipeId: z.string().describe("Recipe ID for storage path"),
         dishName: z.string().describe("Name of the dish"),
         imageUrl: z.string().describe("Source image URL for video generation"),
         stepInstruction: z.string().describe("Step instruction text"),
@@ -510,24 +512,24 @@ Always return your response as valid JSON matching this exact structure:
           const { generateSingleStepVideo } = await import("./videoStorageService");
           
           const result = await generateSingleStepVideo(
+            input.userId,
+            input.recipeId,
             input.dishName,
             input.imageUrl,
             input.stepInstruction,
             input.stepNumber
           );
 
-          if (result.status === "SUCCEEDED" && result.videoUrl) {
+          if (result.status === "completed" && result.videoUrl) {
             return {
               success: true,
               videoUrl: result.videoUrl,
-              taskId: result.taskId,
             };
           } else {
             return {
               success: false,
               error: result.error || "Video generation failed",
               videoUrl: null,
-              taskId: result.taskId,
             };
           }
         } catch (error) {
@@ -536,7 +538,6 @@ Always return your response as valid JSON matching this exact structure:
             success: false,
             error: error instanceof Error ? error.message : "Failed to generate step video",
             videoUrl: null,
-            taskId: null,
           };
         }
       }),

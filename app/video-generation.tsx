@@ -27,6 +27,8 @@ export default function VideoGenerationScreen() {
     dishName?: string;
     recipeData?: string;
     imageUri?: string;
+    userId?: string;
+    recipeId?: string;
   }>();
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -165,10 +167,12 @@ export default function VideoGenerationScreen() {
           setStepVideos([...generatedVideos]);
 
           try {
-            // Call Runway API to generate video
+            // Call Runway API to generate video and store in Supabase
             const result = await generateStepVideoMutation.mutateAsync({
+              userId: params.userId || "anonymous",
+              recipeId: params.recipeId || `temp_${Date.now()}`,
               dishName: params.dishName || "Recipe",
-              imageUrl: params.imageUri,
+              imageUrl: params.imageUri || "",
               stepInstruction: step.instruction,
               stepNumber: step.stepNumber,
             });

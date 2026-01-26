@@ -59,6 +59,7 @@ export default function RecipeCardScreen() {
     steps: string;
     tags: string;
     recipeId?: string; // If viewing an existing recipe
+    userId?: string; // User ID for storage
   }>();
 
   // Parse JSON params
@@ -293,6 +294,7 @@ export default function RecipeCardScreen() {
     const videoImageUri = generatedPhotoUri || displayImageUri;
     
     // Navigate to paywall with recipe data
+    // Include userId and recipeId for video storage
     router.push({
       pathname: "/paywall" as any,
       params: {
@@ -307,6 +309,8 @@ export default function RecipeCardScreen() {
         }),
         imageUri: videoImageUri,
         hasGeneratedPhoto: generatedPhotoUri ? "true" : "false",
+        userId: params.userId || "anonymous",
+        recipeId: savedRecipeId || params.recipeId || `temp_${Date.now()}`,
       },
     });
   };

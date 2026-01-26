@@ -93,6 +93,7 @@ export default function PaywallScreen() {
     imageUri?: string;
     productType?: string; // "video" or "step_photos"
     recipeId?: string;
+    userId?: string;
   }>();
 
   const isStepPhotos = params.productType === "step_photos";
@@ -137,13 +138,15 @@ export default function PaywallScreen() {
         },
       });
     } else if (params.recipeData) {
-      // Navigate to video generation
+      // Navigate to video generation with userId and recipeId for storage
       router.replace({
         pathname: "/video-generation" as any,
         params: {
           dishName: params.dishName,
           recipeData: params.recipeData,
           imageUri: params.imageUri,
+          userId: params.userId || "anonymous",
+          recipeId: params.recipeId || `temp_${Date.now()}`,
         },
       });
     } else {

@@ -3,6 +3,7 @@
  * 
  * This service handles video generation and storage for recipe step videos.
  * Uses Runway Gen-3 API for AI video generation.
+ * Stores videos permanently in Supabase Storage (recipe-videos bucket).
  */
 
 import { 
@@ -11,11 +12,12 @@ import {
   createCookingVideoPrompt,
   type VideoGenerationResult 
 } from "./runwayService";
+import { storagePut } from "./storage";
 
 export interface StepVideo {
   stepIndex: number;
   videoUrl: string;
-  status: "pending" | "generating" | "completed" | "failed";
+  status: "pending" | "generating" | "saving" | "completed" | "failed";
   error?: string;
 }
 
@@ -23,6 +25,7 @@ export interface VideoGenerationProgress {
   totalSteps: number;
   completedSteps: number;
   currentStep: number;
+  currentStatus: "generating" | "saving" | "completed" | "failed";
   stepVideos: StepVideo[];
   status: "idle" | "generating" | "completed" | "failed";
   error?: string;
@@ -32,9 +35,66 @@ export interface VideoGenerationProgress {
 const generationProgress = new Map<string, VideoGenerationProgress>();
 
 /**
+ * Download video from URL and return as Buffer
+ */
+async function downloadVideoToBuffer(videoUrl: string): Promise<Buffer> {
+  console.log(`[VideoStorage] Downloading video from: ${videoUrl}`);
+  
+  const response = await fetch(videoUrl);
+  if (!response.ok) {
+    throw new Error(`Failed to download video: ${response.status} ${response.statusText}`);
+  }
+  
+  const arrayBuffer = await response.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
+/**
+ * Store video permanently in Supabase Storage
+ * 
+ * @param tempVideoUrl - Temporary URL from Runway (expires)
+ * @param userId - User ID for storage path
+ * @param recipeId - Recipe ID for storage path
+ * @param stepIndex - Step index for filename
+ * @returns Permanent public URL
+ */
+export async function storeVideoToSupabase(
+  tempVideoUrl: string,
+  userId: string,
+  recipeId: string,
+  stepIndex: number
+): Promise<string> {
+  try {
+    console.log(`[VideoStorage] Storing video for step ${stepIndex + 1} to Supabase...`);
+    
+    // 1. Download video from Runway temp URL
+    const videoBuffer = await downloadVideoToBuffer(tempVideoUrl);
+    console.log(`[VideoStorage] Downloaded ${videoBuffer.length} bytes`);
+    
+    // 2. Upload to storage with path: recipe-videos/{userId}/{recipeId}/step_{stepIndex}.mp4
+    const storagePath = `recipe-videos/${userId}/${recipeId}/step_${stepIndex + 1}.mp4`;
+    
+    const { url: permanentUrl } = await storagePut(
+      storagePath,
+      videoBuffer,
+      "video/mp4"
+    );
+    
+    console.log(`[VideoStorage] Video stored permanently at: ${permanentUrl}`);
+    return permanentUrl;
+    
+  } catch (error: any) {
+    console.error(`[VideoStorage] Error storing video:`, error);
+    throw new Error(`Failed to store video: ${error?.message || "Unknown error"}`);
+  }
+}
+
+/**
  * Generate videos for all recipe steps using Runway API
+ * and store them permanently in Supabase Storage
  * 
  * @param recipeId - Unique identifier for the recipe
+ * @param userId - User ID for storage path
  * @param dishName - Name of the dish being cooked
  * @param imageUrl - Base image URL for video generation
  * @param steps - Array of recipe steps
@@ -42,6 +102,7 @@ const generationProgress = new Map<string, VideoGenerationProgress>();
  */
 export async function generateStepVideos(
   recipeId: string,
+  userId: string,
   dishName: string,
   imageUrl: string,
   steps: Array<{ stepNumber: number; instruction: string; duration?: number }>,
@@ -54,6 +115,7 @@ export async function generateStepVideos(
     totalSteps,
     completedSteps: 0,
     currentStep: 0,
+    currentStatus: "generating",
     stepVideos: steps.map((_, index) => ({
       stepIndex: index,
       videoUrl: "",
@@ -72,6 +134,7 @@ export async function generateStepVideos(
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
     progress.currentStep = i;
+    progress.currentStatus = "generating";
     progress.stepVideos[i].status = "generating";
     onProgress?.(progress);
     
@@ -96,20 +159,33 @@ export async function generateStepVideos(
       const result = await waitForVideo(startResult.taskId);
       
       if (result.status === "SUCCEEDED" && result.videoUrl) {
+        // Update status to "saving"
+        progress.currentStatus = "saving";
+        progress.stepVideos[i].status = "saving";
+        onProgress?.(progress);
+        
+        // Store video permanently in Supabase
+        const permanentUrl = await storeVideoToSupabase(
+          result.videoUrl,
+          userId,
+          recipeId,
+          i
+        );
+        
         progress.stepVideos[i] = {
           stepIndex: i,
-          videoUrl: result.videoUrl,
+          videoUrl: permanentUrl,
           status: "completed",
         };
         progress.completedSteps++;
         
         stepVideos.push({
           stepIndex: i,
-          videoUrl: result.videoUrl,
+          videoUrl: permanentUrl,
           status: "completed",
         });
         
-        console.log(`[VideoStorage] Step ${i + 1} video completed: ${result.videoUrl}`);
+        console.log(`[VideoStorage] Step ${i + 1} video completed and stored: ${permanentUrl}`);
       } else {
         throw new Error(result.error || "Video generation failed");
       }
@@ -139,6 +215,7 @@ export async function generateStepVideos(
   const anyFailed = stepVideos.some(v => v.status === "failed");
   
   progress.status = allCompleted ? "completed" : anyFailed ? "failed" : "completed";
+  progress.currentStatus = "completed";
   generationProgress.set(recipeId, progress);
   onProgress?.(progress);
   
@@ -146,25 +223,60 @@ export async function generateStepVideos(
 }
 
 /**
- * Generate a single step video
+ * Generate a single step video and store it in Supabase
  */
 export async function generateSingleStepVideo(
+  userId: string,
+  recipeId: string,
   dishName: string,
   imageUrl: string,
   stepInstruction: string,
   stepNumber: number
-): Promise<VideoGenerationResult> {
+): Promise<{ videoUrl: string; status: string; error?: string }> {
   const prompt = createCookingVideoPrompt(stepInstruction, dishName, stepNumber);
   
   console.log(`[VideoStorage] Generating single video for step ${stepNumber}`);
   
-  const startResult = await generateVideoFromImage(imageUrl, prompt, 5);
-  
-  if (startResult.status === "FAILED" || !startResult.taskId) {
-    return startResult;
+  try {
+    const startResult = await generateVideoFromImage(imageUrl, prompt, 5);
+    
+    if (startResult.status === "FAILED" || !startResult.taskId) {
+      return {
+        videoUrl: "",
+        status: "failed",
+        error: startResult.error || "Failed to start video generation"
+      };
+    }
+    
+    const result = await waitForVideo(startResult.taskId);
+    
+    if (result.status === "SUCCEEDED" && result.videoUrl) {
+      // Store permanently in Supabase
+      const permanentUrl = await storeVideoToSupabase(
+        result.videoUrl,
+        userId,
+        recipeId,
+        stepNumber - 1 // Convert to 0-indexed
+      );
+      
+      return {
+        videoUrl: permanentUrl,
+        status: "completed"
+      };
+    }
+    
+    return {
+      videoUrl: "",
+      status: "failed",
+      error: result.error || "Video generation failed"
+    };
+  } catch (error: any) {
+    return {
+      videoUrl: "",
+      status: "failed",
+      error: error?.message || "Unknown error"
+    };
   }
-  
-  return waitForVideo(startResult.taskId);
 }
 
 /**
@@ -179,21 +291,4 @@ export function getGenerationProgress(recipeId: string): VideoGenerationProgress
  */
 export function clearGenerationProgress(recipeId: string): void {
   generationProgress.delete(recipeId);
-}
-
-/**
- * Store step videos in recipe record
- * This is a placeholder - in production, videos would be stored in Supabase Storage
- */
-export async function storeStepVideosToRecipe(
-  recipeId: string,
-  stepVideos: StepVideo[]
-): Promise<void> {
-  // In production with Supabase:
-  // await supabase
-  //   .from('recipes')
-  //   .update({ step_videos: JSON.stringify(stepVideos) })
-  //   .eq('id', recipeId);
-  
-  console.log(`[VideoStorage] Stored ${stepVideos.length} step videos for recipe ${recipeId}`);
 }
