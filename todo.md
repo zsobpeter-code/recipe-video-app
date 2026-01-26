@@ -534,3 +534,32 @@ After generating individual step videos, concatenate them into a single video fi
 - [x] Create ShareMenu modal component
 - [x] Show available share options based on recipe content (card, PDF, AI photo, video)
 - [ ] Integrate ShareMenu with recipe-card screen
+
+
+## Bug Fixes - Critical Issues
+
+### Issue 1: FFmpegKit not available in Expo Go
+- [x] Add try/catch wrapper for FFmpegKit import
+- [x] Create isFFmpegAvailable() function
+- [x] Skip concatenation gracefully in Expo Go
+- [x] Return first video URL as fallback
+- [x] Show alert in video-generation when FFmpeg not available
+
+### Issue 2: "Photos" button text wrapping
+- [x] Add minWidth to action button in SecondaryButton
+- [x] Add numberOfLines={1} to prevent text wrapping
+- [x] Adjust padding for better fit
+
+### Issue 3: Step photos not visible in Cook Mode
+- [x] Increase background image opacity (from 0.3 to 0.6)
+- [x] Reduce overlay darkness (from 0.6 to 0.4)
+- [x] Blur already present at 15px for text readability
+
+### Issue 4: Paywall pricing shows "/mo"
+- [x] Remove "/mo" from $29.99 Unlimited option
+- [x] Remove "/mo" from $9.99 Unlimited Photos option
+- [x] Keep clean price display
+
+### Issue 5: Video requires Photo first
+- [x] Improve alert message to explain why photos are needed
+- [x] Add "Generate Photos & Video" combined option

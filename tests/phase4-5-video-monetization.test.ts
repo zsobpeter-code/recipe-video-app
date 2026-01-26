@@ -91,12 +91,12 @@ describe("Phase 4 & 5: Video Generation & Monetization", () => {
       expect(content).toContain("VIDEO_PRICING_OPTIONS");
       expect(content).toContain("$4.99");
       expect(content).toContain("$17.49");
-      expect(content).toContain("$29.99/mo");
+      expect(content).toContain("$29.99");
       // Step photos pricing
       expect(content).toContain("STEP_PHOTOS_PRICING_OPTIONS");
       expect(content).toContain("$1.99");
       expect(content).toContain("$7.49");
-      expect(content).toContain("$9.99/mo");
+      expect(content).toContain("$9.99");
       expect(content).toContain("Best Value");
     });
 

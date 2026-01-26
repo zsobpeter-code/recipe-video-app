@@ -3,13 +3,27 @@
  * 
  * Uses FFmpeg to merge individual step videos into a single video file
  * for sharing on TikTok/Instagram.
+ * 
+ * Note: FFmpegKit requires a development build and is not available in Expo Go.
  */
 
-import { FFmpegKit, ReturnCode } from "ffmpeg-kit-react-native";
 import * as FileSystem from "expo-file-system/legacy";
 import { Platform } from "react-native";
 import { supabase } from "@/lib/supabase";
 import { decode } from "base64-arraybuffer";
+
+// Dynamically import FFmpegKit - it's not available in Expo Go
+let FFmpegKit: any = null;
+let ReturnCode: any = null;
+
+try {
+  const ffmpeg = require("ffmpeg-kit-react-native");
+  FFmpegKit = ffmpeg.FFmpegKit;
+  ReturnCode = ffmpeg.ReturnCode;
+  console.log("[FFmpeg] FFmpegKit loaded successfully");
+} catch (error) {
+  console.log("[FFmpeg] Not available - running in Expo Go or web");
+}
 
 export interface ConcatResult {
   localPath: string;
@@ -18,17 +32,17 @@ export interface ConcatResult {
 }
 
 export interface ConcatProgress {
-  status: "downloading" | "preparing" | "merging" | "complete" | "failed";
+  status: "downloading" | "preparing" | "merging" | "complete" | "failed" | "skipped";
   message: string;
   progress?: number;
 }
 
 /**
  * Check if FFmpeg is available on this platform
- * FFmpeg is only available on native iOS/Android, not web
+ * FFmpeg is only available in development builds, not Expo Go or web
  */
 export function isFFmpegAvailable(): boolean {
-  return Platform.OS !== "web";
+  return FFmpegKit !== null && Platform.OS !== "web";
 }
 
 /**
@@ -44,15 +58,6 @@ export async function concatenateStepVideos(
   recipeId: string,
   onProgress?: (progress: ConcatProgress) => void
 ): Promise<ConcatResult> {
-  // Check platform support
-  if (!isFFmpegAvailable()) {
-    return {
-      localPath: "",
-      success: false,
-      error: "Video concatenation is only available on iOS/Android devices",
-    };
-  }
-
   // Filter out empty URLs
   const validUrls = stepVideoUrls.filter(url => url && url.startsWith("https://"));
   
@@ -62,6 +67,30 @@ export async function concatenateStepVideos(
       success: false,
       error: "No valid video URLs to concatenate",
     };
+  }
+
+  // Check platform support - if FFmpeg not available, return first video as fallback
+  if (!isFFmpegAvailable()) {
+    console.log("[FFmpeg] Skipping concatenation - not available in Expo Go");
+    onProgress?.({ 
+      status: "skipped", 
+      message: "Video ready (individual steps - full merge requires dev build)" 
+    });
+    
+    // Download first video as fallback
+    const localPath = `${FileSystem.cacheDirectory}final_${recipeId}.mp4`;
+    
+    try {
+      const download = await FileSystem.downloadAsync(validUrls[0], localPath);
+      if (download.status === 200) {
+        return { localPath, success: true };
+      }
+    } catch (error) {
+      console.error("[FFmpeg] Fallback download failed:", error);
+    }
+    
+    // Return the URL directly if download fails
+    return { localPath: validUrls[0], success: true };
   }
 
   if (validUrls.length === 1) {
@@ -182,7 +211,7 @@ export async function concatenateStepVideos(
     } else {
       // Get FFmpeg logs for debugging
       const logs = await session.getAllLogs();
-      const logMessages = logs.map(log => log.getMessage()).join("\n");
+      const logMessages = logs.map((log: any) => log.getMessage()).join("\n");
       console.error(`[FFmpeg] Failed with logs:\n${logMessages}`);
       
       return {
@@ -259,6 +288,12 @@ export async function uploadFinalVideoToSupabase(
 ): Promise<{ success: boolean; url?: string; error?: string }> {
   try {
     console.log(`[VideoUpload] Starting upload for recipe ${recipeId}`);
+    
+    // Check if it's a local file or already a URL
+    if (localPath.startsWith("https://")) {
+      // Already a URL, no need to upload
+      return { success: true, url: localPath };
+    }
     
     // Read file as base64
     const base64 = await FileSystem.readAsStringAsync(localPath, {

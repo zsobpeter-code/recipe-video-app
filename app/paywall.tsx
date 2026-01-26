@@ -45,7 +45,7 @@ const VIDEO_PRICING_OPTIONS: PricingOption[] = [
     id: "unlimited",
     title: "Unlimited",
     subtitle: "Best Value",
-    price: "$29.99/mo",
+    price: "$29.99",
     isBestValue: true,
     credits: -1, // unlimited
   },
@@ -71,7 +71,7 @@ const STEP_PHOTOS_PRICING_OPTIONS: PricingOption[] = [
     id: "unlimited",
     title: "Unlimited Photos",
     subtitle: "Best Value",
-    price: "$9.99/mo",
+    price: "$9.99",
     isBestValue: true,
     credits: -1, // unlimited
   },

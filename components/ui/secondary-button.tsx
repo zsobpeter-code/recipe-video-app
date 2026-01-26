@@ -48,8 +48,8 @@ export function SecondaryButton({
         <View style={styles.content}>
           {icon && <View style={styles.icon}>{icon}</View>}
           <View style={styles.textContainer}>
-            <Text style={styles.text}>{title}</Text>
-            {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+            <Text style={styles.text} numberOfLines={1}>{title}</Text>
+            {subtitle && <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text>}
           </View>
         </View>
       )}
@@ -63,11 +63,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "#C9A962",
-    paddingVertical: 16,
-    paddingHorizontal: 32,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
     alignItems: "center",
     justifyContent: "center",
     minHeight: 52,
+    minWidth: 90,
   },
   fullWidth: {
     width: "100%",
@@ -85,8 +86,9 @@ const styles = StyleSheet.create({
   },
   text: {
     fontFamily: "Inter-Medium",
-    fontSize: 16,
+    fontSize: 15,
     color: "#C9A962",
+    textAlign: "center",
   },
   textContainer: {
     alignItems: "center",

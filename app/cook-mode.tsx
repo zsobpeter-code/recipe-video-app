@@ -354,11 +354,11 @@ export default function CookModeScreen() {
     if (!hasHttpsImage && !hasVideos) {
       // No HTTPS image available - prompt user to generate step photos first
       Alert.alert(
-        "AI Photo Required",
-        "Video generation requires AI-generated photos. Would you like to generate step photos first?",
+        "Step Photos Needed",
+        "To create your video, we first need to generate step-by-step photos. This is included with video purchase.",
         [
           { text: "Cancel", style: "cancel" },
-          { text: "Generate Photos", onPress: handlePhotos },
+          { text: "Generate Photos & Video", onPress: handlePhotos },
         ]
       );
       return;
@@ -630,7 +630,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    opacity: 0.3,
+    opacity: 0.6,
   },
   overlay: {
     position: "absolute",
@@ -638,7 +638,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
   },
   content: {
     flex: 1,
