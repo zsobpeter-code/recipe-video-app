@@ -452,9 +452,16 @@ export default function VideoGenerationScreen() {
           });
         }, 1500);
 
-      } catch (error) {
+      } catch (error: any) {
         console.error("Video generation error:", error);
-        setStatusMessage("Video generation failed. Please try again.");
+        const errorMessage = error?.message || "";
+        if (errorMessage.includes("timeout") || errorMessage.includes("network")) {
+          setStatusMessage("Connection issue. Please check your internet and try again.");
+        } else if (errorMessage.includes("rate limit") || errorMessage.includes("429")) {
+          setStatusMessage("Too many requests. Please wait a moment and try again.");
+        } else {
+          setStatusMessage("Something went wrong. Please try again.");
+        }
       }
     };
 

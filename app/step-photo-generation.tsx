@@ -223,7 +223,15 @@ export default function StepPhotoGenerationScreen() {
         {/* Generation Status */}
         <View style={styles.statusContainer}>
           <Text style={[styles.title, { fontFamily: "PlayfairDisplay-Bold" }]}>
-            {isGenerating ? "Generating Step Photos" : error ? "Generation Failed" : "Photos Ready!"}
+            {isGenerating 
+              ? "Generating Step Photos" 
+              : error 
+                ? "Generation Failed" 
+                : generatedImages.length === 0 
+                  ? "Generation Failed"
+                  : generatedImages.length < steps.length 
+                    ? "Photos Partially Ready" 
+                    : "Photos Ready!"}
           </Text>
           
           <Text style={[styles.dishName, { fontFamily: "Inter-Medium" }]}>
@@ -260,15 +268,65 @@ export default function StepPhotoGenerationScreen() {
           )}
 
           {error && (
-            <Text style={[styles.errorText, { fontFamily: "Inter" }]}>
-              {error}
-            </Text>
+            <View style={styles.errorContainer}>
+              <Text style={[styles.errorText, { fontFamily: "Inter" }]}>
+                {error.includes("timeout") || error.includes("network") 
+                  ? "Connection issue. Please check your internet and try again."
+                  : error.includes("rate limit") || error.includes("429")
+                    ? "Too many requests. Please wait a moment and try again."
+                    : "Something went wrong. Please try again."}
+              </Text>
+              <TouchableOpacity
+                style={styles.retryButton}
+                onPress={() => {
+                  setIsGenerating(true);
+                  setGeneratedImages([]);
+                  setCurrentStep(0);
+                  setError(null);
+                  generateStepPhotos();
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.viewButtonText, { fontFamily: "Inter-Medium" }]}>
+                  Try Again
+                </Text>
+              </TouchableOpacity>
+            </View>
           )}
 
-          {!isGenerating && !error && (
+          {!isGenerating && !error && generatedImages.length === 0 && (
+            <View style={styles.successContainer}>
+              <Text style={[styles.errorText, { fontFamily: "Inter" }]}>
+                No photos could be generated. Please try again.
+              </Text>
+              
+              {/* Retry Button */}
+              <View style={styles.actionButtons}>
+                <TouchableOpacity
+                  style={styles.retryButton}
+                  onPress={() => {
+                    setIsGenerating(true);
+                    setGeneratedImages([]);
+                    setCurrentStep(0);
+                    setError(null);
+                    generateStepPhotos();
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.viewButtonText, { fontFamily: "Inter-Medium" }]}>
+                    Try Again
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {!isGenerating && !error && generatedImages.length > 0 && (
             <View style={styles.successContainer}>
               <Text style={[styles.successText, { fontFamily: "Inter" }]}>
-                Generated {generatedImages.length} step photos
+                {generatedImages.length < steps.length 
+                  ? `Generated ${generatedImages.length} of ${steps.length} step photos`
+                  : `Generated ${generatedImages.length} step photos`}
               </Text>
               
               {/* Action Buttons */}
@@ -442,14 +500,26 @@ const styles = StyleSheet.create({
     color: "#CCCCCC",
     lineHeight: 20,
   },
+  errorContainer: {
+    alignItems: "center",
+    gap: 16,
+  },
   errorText: {
     fontSize: 14,
     color: "#F87171",
     textAlign: "center",
+    lineHeight: 20,
   },
   successContainer: {
     alignItems: "center",
     gap: 8,
+  },
+  retryButton: {
+    backgroundColor: "#C9A962",
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 25,
+    marginTop: 16,
   },
   successText: {
     fontSize: 16,

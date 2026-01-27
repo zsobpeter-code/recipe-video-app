@@ -74,6 +74,12 @@ const MAPPING = {
   // Cook mode
   "frying.pan.fill": "restaurant",
   "timer": "timer",
+  
+  // Paywall features
+  "wand.and.stars": "auto-awesome",
+  "eye": "visibility",
+  "arrow.down.circle": "download",
+  "photo": "photo",
 } as IconMapping;
 
 /**

@@ -591,45 +591,11 @@ export default function VideoPlayerScreen() {
         </View>
       </View>
 
-      {/* Controls */}
-      <View style={styles.controls}>
-        <TouchableOpacity
-          style={[styles.controlButton, currentStepIndex === 0 && styles.controlButtonDisabled]}
-          onPress={handlePrevious}
-          disabled={currentStepIndex === 0}
-          activeOpacity={0.7}
-        >
-          <IconSymbol 
-            name="backward.fill" 
-            size={24} 
-            color={currentStepIndex === 0 ? "#555555" : "#FFFFFF"} 
-          />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.playButton}
-          onPress={handlePlayPause}
-          activeOpacity={0.8}
-        >
-          <IconSymbol 
-            name={isPlaying ? "pause.fill" : "play.fill"} 
-            size={32} 
-            color="#1A1A1A" 
-          />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.controlButton, currentStepIndex === steps.length - 1 && styles.controlButtonDisabled]}
-          onPress={handleNext}
-          disabled={currentStepIndex === steps.length - 1}
-          activeOpacity={0.7}
-        >
-          <IconSymbol 
-            name="forward.fill" 
-            size={24} 
-            color={currentStepIndex === steps.length - 1 ? "#555555" : "#FFFFFF"} 
-          />
-        </TouchableOpacity>
+      {/* Navigation hint */}
+      <View style={styles.swipeHint}>
+        <Text style={[styles.swipeHintText, { fontFamily: "Inter" }]}>
+          Swipe left/right or tap a step below
+        </Text>
       </View>
 
 
@@ -859,31 +825,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#888888",
   },
-  controls: {
-    flexDirection: "row",
+  swipeHint: {
     alignItems: "center",
-    justifyContent: "center",
-    gap: 32,
-    paddingVertical: 16,
+    paddingVertical: 12,
   },
-  controlButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  controlButtonDisabled: {
-    opacity: 0.5,
-  },
-  playButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "#C9A962",
-    alignItems: "center",
-    justifyContent: "center",
+  swipeHintText: {
+    fontSize: 12,
+    color: "#666666",
+    fontStyle: "italic",
   },
   stepsSection: {
     flex: 1,

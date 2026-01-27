@@ -77,11 +77,18 @@ const STEP_PHOTOS_PRICING_OPTIONS: PricingOption[] = [
   },
 ];
 
-const FEATURES = [
-  { icon: "video.fill", text: "Generate cooking tutorial videos" },
-  { icon: "photo.fill", text: "AI-enhanced food photography" },
-  { icon: "bookmark.fill", text: "Unlimited recipe storage" },
-  { icon: "arrow.clockwise", text: "Cloud sync across devices" },
+const VIDEO_FEATURES = [
+  { icon: "video.fill", text: "AI-generated cooking tutorial videos" },
+  { icon: "wand.and.stars", text: "Runway Gen-3 video technology" },
+  { icon: "square.and.arrow.up", text: "Share directly to TikTok & Instagram" },
+  { icon: "arrow.down.circle", text: "Save videos to camera roll" },
+];
+
+const STEP_PHOTOS_FEATURES = [
+  { icon: "photo.fill", text: "AI-generated photos for each step" },
+  { icon: "wand.and.stars", text: "Flux AI image technology" },
+  { icon: "eye", text: "See what each step should look like" },
+  { icon: "bookmark.fill", text: "Photos saved with your recipe" },
 ];
 
 export default function PaywallScreen() {
@@ -215,7 +222,7 @@ export default function PaywallScreen() {
 
         {/* Features */}
         <View style={styles.featuresContainer}>
-          {FEATURES.map((feature, index) => (
+          {(isStepPhotos ? STEP_PHOTOS_FEATURES : VIDEO_FEATURES).map((feature, index) => (
             <View key={index} style={styles.featureRow}>
               <View style={styles.featureIconContainer}>
                 <IconSymbol name={feature.icon as any} size={18} color="#C9A962" />

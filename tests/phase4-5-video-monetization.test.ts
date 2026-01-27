@@ -76,11 +76,10 @@ describe("Phase 4 & 5: Video Generation & Monetization", () => {
       const paywallPath = path.join(projectRoot, "app/paywall.tsx");
       const content = fs.readFileSync(paywallPath, "utf-8");
       
-      expect(content).toContain("FEATURES");
-      expect(content).toContain("Generate cooking tutorial videos");
-      expect(content).toContain("AI-enhanced food photography");
-      expect(content).toContain("Unlimited recipe storage");
-      expect(content).toContain("Cloud sync across devices");
+      expect(content).toContain("STEP_PHOTOS_FEATURES");
+      expect(content).toContain("VIDEO_FEATURES");
+      expect(content).toContain("AI-generated photos for each step");
+      expect(content).toContain("AI-generated cooking tutorial videos");
     });
 
     it("should have pricing options", () => {
@@ -167,8 +166,8 @@ describe("Phase 4 & 5: Video Generation & Monetization", () => {
       
       expect(content).toContain("isPlaying");
       expect(content).toContain("handlePlayPause");
-      expect(content).toContain("play.fill");
-      expect(content).toContain("pause.fill");
+      // Play/pause icons are in the overlay
+      expect(content).toContain("playOverlay");
     });
 
     it("should display current step instruction", () => {

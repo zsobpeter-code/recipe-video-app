@@ -33,16 +33,14 @@ describe("Video Player Bug Fixes", () => {
     });
   });
 
-  describe("BUG 2: Duplicate play buttons removed", () => {
+  describe("BUG 2: Simplified controls - only play overlay", () => {
     it("should NOT have playButtonOverlay style", () => {
       expect(videoPlayerContent).not.toContain("playButtonOverlay:");
     });
 
-    it("should have only one play/pause button in navigation controls", () => {
-      expect(videoPlayerContent).toContain("playButton");
-      // The video container should be touchable for play/pause
-      expect(videoPlayerContent).toContain("TouchableOpacity");
-      expect(videoPlayerContent).toContain("onPress={handlePlayPause}");
+    it("should have swipe navigation hint instead of buttons", () => {
+      expect(videoPlayerContent).toContain("swipeHint");
+      expect(videoPlayerContent).toContain("Swipe left/right or tap a step below");
     });
 
     it("should have play overlay when paused", () => {

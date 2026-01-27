@@ -727,3 +727,54 @@ After generating individual step videos, concatenate them into a single video fi
 - [x] Remove Scene Description section
 - [x] Add swipe left/right for step navigation (GestureDetector)
 - [x] Keep tappable step list at bottom
+
+
+## Bug Fixes - Round 4
+
+### BUG 1: Video Player - Redundant Controls
+- [ ] Remove large play button below video
+- [ ] Remove Previous/Next navigation buttons
+- [ ] Keep only: play overlay on video, swipe navigation, tappable step list
+
+### BUG 2: Photo Generation - Wrong Count Display
+- [ ] Fix "Generated 0 step photos" showing as success
+- [ ] Show error state if 0 photos generated
+- [ ] Show partial success if some photos failed
+- [ ] Display actual count: "Generated X of Y step photos"
+
+### BUG 3: Photos Paywall - Wrong Feature List
+- [ ] Remove video/AI photo mentions
+- [ ] Update to: AI photo for each step, visual guide, shareable PDF
+
+### BUG 4: Video Paywall - Wrong Feature List
+- [ ] Remove AI photo mention
+- [ ] Update to: AI video for each step, complete tutorial, TikTok/Instagram share
+
+### BUG 5: API Error Messages
+- [ ] Map technical errors to friendly messages
+- [ ] Show "high demand" message for usage exhausted
+- [ ] Add retry button instead of auto-return
+
+
+## Bug Fixes - Round 4 (Completed)
+
+### Issue 1: Redundant video player controls
+- [x] Remove the play button from controls section
+- [x] Remove prev/next buttons (swipe is enough)
+- [x] Keep only the tappable step list and swipe gestures
+- [x] Add swipe hint text "Swipe left/right or tap a step below"
+
+### Issue 2: Photo generation count display
+- [x] Fix success screen to show "X of Y photos generated"
+- [x] Show partial success state when some photos fail
+- [x] Add retry button for failed photos
+
+### Issue 3: Paywall feature lists
+- [x] Create STEP_PHOTOS_FEATURES (AI-generated photos, visual cooking guide, etc.)
+- [x] Create VIDEO_FEATURES (AI video for each step, shareable content, etc.)
+- [x] Show different features based on purchase type (isStepPhotos)
+
+### Issue 4: API error messages
+- [x] Replace technical errors with user-friendly messages
+- [x] Add retry button on error screens
+- [x] Handle timeout, rate limit, and network errors specifically
