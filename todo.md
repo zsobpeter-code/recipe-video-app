@@ -778,3 +778,21 @@ After generating individual step videos, concatenate them into a single video fi
 - [x] Replace technical errors with user-friendly messages
 - [x] Add retry button on error screens
 - [x] Handle timeout, rate limit, and network errors specifically
+
+## Bug Fixes (Round 5) - Video Player Final Fixes
+
+### Issue 1: Remove Time Indicator from Video Player
+- [x] Remove progress bar with time (0:05 ─────── 2 min)
+- [x] Remove any time duration display
+- [x] Keep step text description, swipe hint, and ALL STEPS list
+
+### Issue 2: Add Download/Save Button
+- [x] Add download button (⬇️) in header - saves to Camera Roll
+- [x] Request MediaLibrary permissions
+- [x] Download video from final_video_url and save to library
+- [x] Show success/error alerts
+
+### Issue 3: Fix Share Button to Share Actual Video
+- [x] Share button should share actual video file, not text
+- [x] Download video to cache, then share via expo-sharing
+- [x] Clean up temp file after sharing

@@ -71,15 +71,14 @@ describe("Video Player Bug Fixes", () => {
       expect(videoPlayerContent).toContain('from "react-native"');
     });
 
-    it("should have handleShare function with Share.share call", () => {
+    it("should have handleShare function", () => {
       expect(videoPlayerContent).toContain("handleShare");
-      expect(videoPlayerContent).toContain("Share.share");
     });
 
-    it("should share recipe name, step count, and total time", () => {
-      expect(videoPlayerContent).toContain("dishName");
-      expect(videoPlayerContent).toContain("steps.length");
-      expect(videoPlayerContent).toContain("totalMins");
+    it("should share actual video file using Sharing.shareAsync", () => {
+      expect(videoPlayerContent).toContain("Sharing.shareAsync");
+      expect(videoPlayerContent).toContain("mimeType");
+      expect(videoPlayerContent).toContain("video/mp4");
     });
 
     it("should handle share errors gracefully", () => {
@@ -104,12 +103,13 @@ describe("Video Player Bug Fixes", () => {
   });
 
   describe("Video Player structure", () => {
-    it("should have proper header with close and share buttons", () => {
+    it("should have proper header with close, download, and share buttons", () => {
       expect(videoPlayerContent).toContain("handleClose");
       expect(videoPlayerContent).toContain("handleShare");
+      expect(videoPlayerContent).toContain("handleDownload");
       expect(videoPlayerContent).toContain('name="xmark"');
-      // Share button now uses square.and.arrow.up icon
       expect(videoPlayerContent).toContain('name="square.and.arrow.up"');
+      expect(videoPlayerContent).toContain('name="arrow.down.circle"');
     });
 
     it("should have navigation controls with previous, play/pause, next", () => {
@@ -123,10 +123,28 @@ describe("Video Player Bug Fixes", () => {
       expect(videoPlayerContent).toContain("currentStep?.instruction");
     });
 
-    it("should have progress bar", () => {
-      expect(videoPlayerContent).toContain("progressContainer");
-      expect(videoPlayerContent).toContain("progressBar");
-      expect(videoPlayerContent).toContain("progressFill");
+    it("should NOT have progress bar (removed per user request)", () => {
+      // Progress bar and time indicator were intentionally removed
+      expect(videoPlayerContent).not.toContain("progressContainer");
+      expect(videoPlayerContent).not.toContain("progressBar");
+    });
+  });
+
+  describe("Download functionality", () => {
+    it("should have handleDownload function", () => {
+      expect(videoPlayerContent).toContain("handleDownload");
+    });
+
+    it("should request MediaLibrary permissions", () => {
+      expect(videoPlayerContent).toContain("MediaLibrary.requestPermissionsAsync");
+    });
+
+    it("should save to library using MediaLibrary.saveToLibraryAsync", () => {
+      expect(videoPlayerContent).toContain("MediaLibrary.saveToLibraryAsync");
+    });
+
+    it("should show success alert after saving", () => {
+      expect(videoPlayerContent).toContain("Video saved to your Camera Roll");
     });
   });
 });

@@ -34,7 +34,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import * as Sharing from "expo-sharing";
 import * as FileSystem from "expo-file-system/legacy";
-import { saveVideoToCameraRoll } from "@/lib/recipeShareService";
+import * as MediaLibrary from "expo-media-library";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -70,6 +70,7 @@ export default function VideoPlayerScreen() {
     stepVideos?: string; // JSON string of step videos from Runway
     mode?: string;
     finalVideoPath?: string; // Local path to concatenated final video
+    finalVideoUrl?: string; // HTTPS URL to final video in storage
   }>();
 
   const isCookMode = params.mode === "cook";
@@ -83,6 +84,7 @@ export default function VideoPlayerScreen() {
   const [isVideoLoading, setIsVideoLoading] = useState(false);
   const [showFinalVideo, setShowFinalVideo] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
   
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stepsScrollRef = useRef<ScrollView>(null);
@@ -90,6 +92,9 @@ export default function VideoPlayerScreen() {
   // Get current step video URL
   const currentStepVideo = stepVideos.find(v => v.stepIndex === currentStepIndex);
   const hasRealVideo = currentStepVideo?.videoUrl && currentStepVideo.status === "completed";
+
+  // Get the final video URL (prefer local path, fallback to HTTPS URL)
+  const finalVideoSource = params.finalVideoPath || params.finalVideoUrl;
 
   // Create video player for current step
   const player = useVideoPlayer(hasRealVideo ? currentStepVideo.videoUrl : null, (player) => {
@@ -323,16 +328,6 @@ export default function VideoPlayerScreen() {
 
   const currentStep = steps[currentStepIndex];
   const currentEnriched = enrichedSteps.find(e => e.stepNumber === currentStepIndex + 1);
-  
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${String(secs).padStart(2, "0")}`;
-  };
-
-  const progressPercent = currentStep 
-    ? Math.min((elapsedTime / currentStep.durationSeconds) * 100, 100) 
-    : 0;
 
   const handlePlayPause = () => {
     if (Platform.OS !== "web") {
@@ -391,76 +386,105 @@ export default function VideoPlayerScreen() {
     router.back();
   };
 
-  const handleShare = async () => {
+  // Download video to Camera Roll
+  const handleDownload = async () => {
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
     
-    try {
-      // If we have a final concatenated video, share it directly
-      if (params.finalVideoPath && Platform.OS !== "web") {
-        const isAvailable = await Sharing.isAvailableAsync();
-        
-        if (isAvailable) {
-          // Check if file exists
-          const fileInfo = await FileSystem.getInfoAsync(params.finalVideoPath);
-          
-          if (fileInfo.exists) {
-            await Sharing.shareAsync(params.finalVideoPath, {
-              mimeType: "video/mp4",
-              dialogTitle: `Share ${params.dishName || "Recipe"} Video`,
-              UTI: "public.mpeg-4",
-            });
-            return;
-          }
-        }
-      }
-      
-      // Fallback to text share
-      const totalTime = steps.reduce((sum, s) => sum + s.durationSeconds, 0);
-      const totalMins = Math.ceil(totalTime / 60);
-      
-      await Share.share({
-        message: `Check out this recipe video for ${params.dishName || "a delicious dish"}! ${steps.length} steps, ${totalMins} minutes total cooking time.`,
-        title: params.dishName || "Recipe Video",
-      });
-    } catch (error) {
-      console.error("Share error:", error);
-      Alert.alert("Share Error", "Failed to share video. Please try again.");
-    }
-  };
-
-  const handleSaveVideo = async () => {
-    if (Platform.OS !== "web") {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-    
-    if (!params.finalVideoPath) {
-      Alert.alert("No Video", "No video available to save.");
+    if (!finalVideoSource) {
+      Alert.alert("No Video", "Please wait for video generation to complete.");
       return;
     }
     
     setIsSaving(true);
     
     try {
-      const result = await saveVideoToCameraRoll(
-        params.finalVideoPath,
-        params.dishName || "Recipe"
-      );
+      // Request permissions
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission Required", "Please allow access to save videos to your Camera Roll.");
+        setIsSaving(false);
+        return;
+      }
       
-      if (result.success) {
-        if (Platform.OS !== "web") {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        }
-        Alert.alert("Saved!", "Video saved to your camera roll.");
-      } else {
-        Alert.alert("Error", result.error || "Failed to save video.");
+      let localPath = finalVideoSource;
+      
+      // If it's a remote URL, download it first
+      if (finalVideoSource.startsWith("http")) {
+        const downloadPath = `${FileSystem.cacheDirectory}download_video_${Date.now()}.mp4`;
+        const downloadResult = await FileSystem.downloadAsync(finalVideoSource, downloadPath);
+        localPath = downloadResult.uri;
+      }
+      
+      // Save to Camera Roll
+      await MediaLibrary.saveToLibraryAsync(localPath);
+      
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      
+      Alert.alert("Saved!", "Video saved to your Camera Roll.");
+      
+      // Clean up temp file if we downloaded it
+      if (finalVideoSource.startsWith("http")) {
+        await FileSystem.deleteAsync(localPath, { idempotent: true });
       }
     } catch (error) {
-      console.error("Save video error:", error);
+      console.error("Download error:", error);
       Alert.alert("Error", "Failed to save video. Please try again.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Share actual video file
+  const handleShare = async () => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    
+    if (!finalVideoSource) {
+      Alert.alert("No Video", "Video is not ready yet.");
+      return;
+    }
+    
+    setIsSharing(true);
+    
+    try {
+      const isAvailable = await Sharing.isAvailableAsync();
+      
+      if (!isAvailable) {
+        Alert.alert("Sharing Unavailable", "Sharing is not available on this device.");
+        setIsSharing(false);
+        return;
+      }
+      
+      let localPath = finalVideoSource;
+      
+      // If it's a remote URL, download it first
+      if (finalVideoSource.startsWith("http")) {
+        const downloadPath = `${FileSystem.cacheDirectory}share_video_${Date.now()}.mp4`;
+        const downloadResult = await FileSystem.downloadAsync(finalVideoSource, downloadPath);
+        localPath = downloadResult.uri;
+      }
+      
+      // Share the video file
+      await Sharing.shareAsync(localPath, {
+        mimeType: "video/mp4",
+        dialogTitle: `Share ${params.dishName || "Recipe"} Video`,
+        UTI: "public.mpeg-4",
+      });
+      
+      // Clean up temp file if we downloaded it
+      if (finalVideoSource.startsWith("http")) {
+        await FileSystem.deleteAsync(localPath, { idempotent: true });
+      }
+    } catch (error) {
+      console.error("Share error:", error);
+      Alert.alert("Error", "Failed to share video. Please try again.");
+    } finally {
+      setIsSharing(false);
     }
   };
 
@@ -488,13 +512,34 @@ export default function VideoPlayerScreen() {
         >
           {isCookMode ? "Cook Mode" : "Video Tutorial"}
         </Text>
-        <TouchableOpacity 
-          style={styles.headerButton}
-          onPress={handleShare}
-          activeOpacity={0.7}
-        >
-          <IconSymbol name="square.and.arrow.up" size={20} color="#C9A962" />
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          {/* Download button */}
+          <TouchableOpacity 
+            style={styles.headerIconButton}
+            onPress={handleDownload}
+            activeOpacity={0.7}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <ActivityIndicator size="small" color="#C9A962" />
+            ) : (
+              <IconSymbol name="arrow.down.circle" size={22} color="#C9A962" />
+            )}
+          </TouchableOpacity>
+          {/* Share button */}
+          <TouchableOpacity 
+            style={styles.headerIconButton}
+            onPress={handleShare}
+            activeOpacity={0.7}
+            disabled={isSharing}
+          >
+            {isSharing ? (
+              <ActivityIndicator size="small" color="#C9A962" />
+            ) : (
+              <IconSymbol name="square.and.arrow.up" size={20} color="#C9A962" />
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Video/Image Container - Swipeable */}
@@ -562,9 +607,6 @@ export default function VideoPlayerScreen() {
 
       {/* Current Step Info */}
       <View style={styles.currentStepContainer}>
-        <Text style={[styles.currentStepLabel, { fontFamily: "Inter-Medium" }]}>
-          STEP {currentStepIndex + 1} OF {steps.length}
-        </Text>
         {isCookMode && (
           <Text style={[styles.dishNameSubtitle, { fontFamily: "PlayfairDisplay-Bold" }]}>
             {params.dishName || "Recipe"}
@@ -573,22 +615,6 @@ export default function VideoPlayerScreen() {
         <Text style={[styles.currentStepText, { fontFamily: "Inter" }]}>
           {currentStep?.instruction || "Loading..."}
         </Text>
-        
-      </View>
-
-      {/* Progress Bar */}
-      <View style={styles.progressContainer}>
-        <View style={styles.progressBar}>
-          <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
-        </View>
-        <View style={styles.timeContainer}>
-          <Text style={[styles.timeText, { fontFamily: "Inter" }]}>
-            {formatTime(elapsedTime)}
-          </Text>
-          <Text style={[styles.timeText, { fontFamily: "Inter" }]}>
-            {currentStep?.duration || "0:00"}
-          </Text>
-        </View>
       </View>
 
       {/* Navigation hint */}
@@ -650,9 +676,6 @@ export default function VideoPlayerScreen() {
                   >
                     {step.instruction}
                   </Text>
-                  <Text style={[styles.stepDuration, { fontFamily: "Inter" }]}>
-                    {step.duration}
-                  </Text>
                 </View>
               </TouchableOpacity>
             );
@@ -672,6 +695,19 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   headerButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  headerIconButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
@@ -766,12 +802,6 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 12,
   },
-  currentStepLabel: {
-    fontSize: 11,
-    color: "#C9A962",
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
   dishNameSubtitle: {
     fontSize: 20,
     color: "#FFFFFF",
@@ -781,49 +811,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#FFFFFF",
     lineHeight: 24,
-  },
-  visualPromptContainer: {
-    marginTop: 12,
-    padding: 12,
-    backgroundColor: "rgba(201, 169, 98, 0.1)",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "rgba(201, 169, 98, 0.2)",
-  },
-  visualPromptLabel: {
-    fontSize: 11,
-    color: "#C9A962",
-    letterSpacing: 0.5,
-    marginBottom: 6,
-  },
-  visualPromptText: {
-    fontSize: 13,
-    color: "#888888",
-    lineHeight: 18,
-  },
-  progressContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-  },
-  progressBar: {
-    height: 4,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    borderRadius: 2,
-    overflow: "hidden",
-  },
-  progressFill: {
-    height: "100%",
-    backgroundColor: "#C9A962",
-    borderRadius: 2,
-  },
-  timeContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 8,
-  },
-  timeText: {
-    fontSize: 12,
-    color: "#888888",
   },
   swipeHint: {
     alignItems: "center",
@@ -891,47 +878,5 @@ const styles = StyleSheet.create({
   },
   stepInstructionActive: {
     color: "#FFFFFF",
-  },
-  stepDuration: {
-    fontSize: 12,
-    color: "#666666",
-  },
-  videoActionButtons: {
-    flexDirection: "row",
-    gap: 12,
-    paddingHorizontal: 20,
-    marginBottom: 16,
-  },
-  shareToSocialButton: {
-    flex: 1,
-    backgroundColor: "#C9A962",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-  },
-  shareToSocialText: {
-    fontSize: 15,
-    color: "#1A1A1A",
-  },
-  saveToRollButton: {
-    flex: 1,
-    backgroundColor: "transparent",
-    borderWidth: 1,
-    borderColor: "#C9A962",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-  },
-  saveToRollText: {
-    fontSize: 15,
-    color: "#C9A962",
   },
 });
