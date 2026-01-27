@@ -675,3 +675,55 @@ After generating individual step videos, concatenate them into a single video fi
 - [x] Fix NaN handling in time calculation
 - [x] Format time as hours/minutes when >= 60 min
 - [x] Show "--" when time is 0
+
+
+## Comprehensive Bug Fixes & UX Improvements
+
+### Critical Bugs
+- [ ] Fix duplicate recipe saves - recipe should be ONE entity that gets updated
+- [ ] Fix AI recipe recognition for Hungarian/international dish names
+- [ ] Fix shareAIPhoto null error - add null checks
+- [ ] Fix PDF missing image - ensure valid HTTPS URL
+
+### Recipe Card Flow Changes
+- [ ] Remove free "Generate AI Photo" button
+- [ ] Add status badges [Step Photos ✓/✗] [Video ✓/✗]
+- [ ] Update bottom bar button logic based on content state
+- [ ] Preserve original photo for handwritten recipes
+
+### Cook Mode Changes
+- [ ] Remove Save button from Cook Mode
+- [ ] Make background photo sharper (blur 2, opacity 0.85, overlay 0.25)
+- [ ] Update button text when content exists (View Photos vs $1.99)
+
+### Video Player Simplification
+- [ ] Remove large play button below video
+- [ ] Remove Previous/Next buttons
+- [ ] Add swipe navigation (left=next, right=prev)
+- [ ] Make step list tappable to jump to step
+- [ ] Replace Save with Download icon in header
+- [ ] Share sends concatenated video
+
+
+## Comprehensive Bug Fixes & UX Improvements (Round 3)
+
+### Critical Bugs
+- [x] Fix duplicate recipe saves (added isSaving guard)
+- [x] Fix AI recipe recognition for international dish names (improved prompt)
+- [x] Fix share AI photo error (added null check)
+
+### Recipe Card Flow
+- [x] Remove free "Generate AI Photo" button
+- [x] Update bottom bar: Save (hide when saved), Cook, Video
+
+### Cook Mode Changes
+- [x] Remove Save button (save happens on recipe card)
+- [x] Make background sharper (reduce blur from 5 to 2)
+- [x] Rename "Photos" to "Step Photos"
+- [x] Rename "Video" to "Make Video"
+
+### Video Player Simplification
+- [x] Remove Share and Save buttons from video player
+- [x] Remove Scene Description section
+- [x] Add swipe left/right for step navigation (GestureDetector)
+- [x] Keep tappable step list at bottom

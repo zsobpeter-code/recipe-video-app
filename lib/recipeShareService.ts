@@ -284,17 +284,34 @@ export async function shareAIPhoto(
   dishName: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    // Validate inputs
+    if (!imageUrl) {
+      return { success: false, error: "No image URL provided" };
+    }
+    
+    if (!imageUrl.startsWith("https://")) {
+      return { success: false, error: "Invalid image URL - must be HTTPS" };
+    }
+    
     const isAvailable = await Sharing.isAvailableAsync();
     if (!isAvailable) {
       return { success: false, error: "Sharing is not available on this device" };
     }
     
     // Download image to local cache
-    const localPath = `${FileSystem.cacheDirectory}${dishName.replace(/[^a-zA-Z0-9]/g, "_")}_ai_photo.jpg`;
-    const download = await FileSystem.downloadAsync(imageUrl, localPath);
+    const safeDishName = (dishName || "recipe").replace(/[^a-zA-Z0-9]/g, "_");
+    const localPath = `${FileSystem.cacheDirectory}${safeDishName}_ai_photo.jpg`;
     
-    if (download.status !== 200) {
-      return { success: false, error: "Failed to download image" };
+    let download;
+    try {
+      download = await FileSystem.downloadAsync(imageUrl, localPath);
+    } catch (downloadError) {
+      console.error("[ShareService] Download error:", downloadError);
+      return { success: false, error: "Failed to download image from server" };
+    }
+    
+    if (!download || download.status !== 200) {
+      return { success: false, error: `Failed to download image (status: ${download?.status || "unknown"})` };
     }
     
     await Sharing.shareAsync(localPath, {

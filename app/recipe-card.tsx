@@ -103,6 +103,17 @@ export default function RecipeCardScreen() {
   // Check if we have both original and generated images (for toggle)
   const hasOriginalImage = !!params.imageUri && params.imageUri.length > 0;
   
+  // Check if step photos exist
+  const hasStepPhotos = (() => {
+    if (!params.stepImages) return false;
+    try {
+      const images = JSON.parse(params.stepImages);
+      return Array.isArray(images) && images.length > 0;
+    } catch {
+      return false;
+    }
+  })();
+  
   // Check if videos are already cached
   const hasVideos = (() => {
     if (!params.stepVideos) return false;
@@ -605,36 +616,6 @@ export default function RecipeCardScreen() {
             </Text>
           </View>
 
-          {/* Generate AI Photo button - in scroll flow */}
-          {!generatedPhotoUri && (
-            <TouchableOpacity
-              style={styles.generatePhotoButtonInline}
-              onPress={handleGenerateAIPhoto}
-              disabled={isGeneratingPhoto}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={["rgba(201,169,98,0.9)", "rgba(168,139,74,0.9)"]}
-                style={styles.generatePhotoGradient}
-              >
-                {isGeneratingPhoto ? (
-                  <>
-                    <ActivityIndicator size="small" color="#1A1A1A" />
-                    <Text style={[styles.generatePhotoText, { fontFamily: "Inter-Medium" }]}>
-                      Generating...
-                    </Text>
-                  </>
-                ) : (
-                  <>
-                    <IconSymbol name="sparkles" size={20} color="#1A1A1A" />
-                    <Text style={[styles.generatePhotoText, { fontFamily: "Inter-Medium" }]}>
-                      Generate AI Photo
-                    </Text>
-                  </>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
 
           {/* Tags */}
           {tags.length > 0 && (
@@ -783,19 +764,22 @@ export default function RecipeCardScreen() {
         </View>
       </ScrollView>
 
-      {/* Bottom action buttons - 3 equal buttons */}
+      {/* Bottom action buttons - dynamic based on content state */}
       <View style={[styles.bottomActions, { paddingBottom: insets.bottom + 16 }]}>
-        <SecondaryButton
-          title={isSaved ? "Saved" : "Save"}
-          onPress={handleSaveToCollection}
-          icon={isSaving ? (
-            <ActivityIndicator size="small" color="#C9A962" />
-          ) : (
-            <IconSymbol name="bookmark.fill" size={16} color="#C9A962" />
-          )}
-          style={{ flex: 1, opacity: isSaving ? 0.7 : 1 }}
-          disabled={isSaving}
-        />
+        {/* Only show Save button if not already saved */}
+        {!isSaved && (
+          <SecondaryButton
+            title="Save"
+            onPress={handleSaveToCollection}
+            icon={isSaving ? (
+              <ActivityIndicator size="small" color="#C9A962" />
+            ) : (
+              <IconSymbol name="bookmark.fill" size={16} color="#C9A962" />
+            )}
+            style={{ flex: 1, opacity: isSaving ? 0.7 : 1 }}
+            disabled={isSaving}
+          />
+        )}
         <PrimaryButton
           title="Cook"
           onPress={handleCookMode}
@@ -803,7 +787,7 @@ export default function RecipeCardScreen() {
           style={{ flex: 1 }}
         />
         <SecondaryButton
-          title={hasVideos ? "Watch Video" : "Video"}
+          title={hasVideos ? "Watch" : "Video"}
           subtitle={hasVideos ? undefined : "$4.99"}
           onPress={handleGenerateVideo}
           icon={<IconSymbol name="video.fill" size={16} color="#C9A962" />}

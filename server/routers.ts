@@ -139,7 +139,22 @@ Always return your response as valid JSON matching this exact structure:
         if (dishName) {
           // When user provides a dish name, they are CORRECTING the AI's detection
           // Generate a recipe specifically for that dish, not what's in the image
-          userContent = `The user has specified that this is "${dishName}". Please generate a complete, authentic recipe for ${dishName}. Use the image as visual reference for presentation, but create the recipe based on the dish name provided. The dish name in your response MUST be "${dishName}" or a close variant.`;
+          // IMPORTANT: Handle international dish names (Hungarian, Polish, Japanese, etc.)
+          userContent = `IMPORTANT: The user has explicitly specified that this dish is called "${dishName}". 
+
+You MUST:
+1. Research and provide the AUTHENTIC recipe for "${dishName}" - this is likely an international dish name (could be Hungarian, Polish, Japanese, Indian, etc.)
+2. Do NOT guess based on the image - the user knows what dish this is
+3. The dish name in your response MUST be "${dishName}" exactly as provided
+4. Provide traditional, authentic ingredients and cooking methods for this specific dish
+5. If "${dishName}" is a well-known dish from any cuisine, provide its authentic recipe
+
+For example:
+- "Rakott krumpli" = Hungarian layered potato casserole with eggs and sausage
+- "Bigos" = Polish hunter's stew
+- "Okonomiyaki" = Japanese savory pancake
+
+Generate the complete, authentic recipe for "${dishName}".`;
         }
         if (userNotes) {
           userContent += `\n\nAdditional context from the user: "${userNotes}"`;

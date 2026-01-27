@@ -90,14 +90,10 @@ describe("Video Player Bug Fixes", () => {
     });
   });
 
-  describe("BUG 5: Generate AI Photo button on Recipe Card", () => {
-    it("should have Generate AI Photo button", () => {
-      expect(recipeCardContent).toContain("Generate AI Photo");
+  describe("BUG 5: AI Photo functionality on Recipe Card", () => {
+    it("should have AI photo generation handler", () => {
+      // Free AI photo button was removed, but handler still exists for paid flow
       expect(recipeCardContent).toContain("handleGenerateAIPhoto");
-    });
-
-    it("should show button when no generated photo exists", () => {
-      expect(recipeCardContent).toContain("!generatedPhotoUri");
     });
 
     it("should call generateImage mutation", () => {
@@ -114,7 +110,8 @@ describe("Video Player Bug Fixes", () => {
       expect(videoPlayerContent).toContain("handleClose");
       expect(videoPlayerContent).toContain("handleShare");
       expect(videoPlayerContent).toContain('name="xmark"');
-      expect(videoPlayerContent).toContain('name="paperplane.fill"');
+      // Share button now uses square.and.arrow.up icon
+      expect(videoPlayerContent).toContain('name="square.and.arrow.up"');
     });
 
     it("should have navigation controls with previous, play/pause, next", () => {

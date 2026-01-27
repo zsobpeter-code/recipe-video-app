@@ -24,7 +24,9 @@ import Animated, {
   Easing,
   cancelAnimation,
   interpolate,
+  runOnJS,
 } from "react-native-reanimated";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 
@@ -365,6 +367,23 @@ export default function VideoPlayerScreen() {
     }
   };
 
+  // Swipe gesture for navigating between steps
+  const swipeGesture = Gesture.Pan()
+    .runOnJS(true)
+    .onEnd((event) => {
+      const { translationX, velocityX } = event;
+      const threshold = 50;
+      const velocityThreshold = 500;
+      
+      if (translationX > threshold || velocityX > velocityThreshold) {
+        // Swipe right - go to previous step
+        handlePrevious();
+      } else if (translationX < -threshold || velocityX < -velocityThreshold) {
+        // Swipe left - go to next step
+        handleNext();
+      }
+    });
+
   const handleClose = () => {
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -478,7 +497,8 @@ export default function VideoPlayerScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Video/Image Container */}
+      {/* Video/Image Container - Swipeable */}
+      <GestureDetector gesture={swipeGesture}>
       <View style={styles.videoContainer}>
         {hasRealVideo ? (
           // Real video playback
@@ -538,6 +558,7 @@ export default function VideoPlayerScreen() {
           </TouchableOpacity>
         )}
       </View>
+      </GestureDetector>
 
       {/* Current Step Info */}
       <View style={styles.currentStepContainer}>
@@ -553,17 +574,6 @@ export default function VideoPlayerScreen() {
           {currentStep?.instruction || "Loading..."}
         </Text>
         
-        {/* Visual prompt (for video mode) */}
-        {!isCookMode && currentEnriched && (
-          <View style={styles.visualPromptContainer}>
-            <Text style={[styles.visualPromptLabel, { fontFamily: "Inter-Medium" }]}>
-              Scene Description
-            </Text>
-            <Text style={[styles.visualPromptText, { fontFamily: "Inter" }]}>
-              {currentEnriched.visualPrompt}
-            </Text>
-          </View>
-        )}
       </View>
 
       {/* Progress Bar */}
@@ -622,37 +632,6 @@ export default function VideoPlayerScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Share and Save Buttons (only if final video available) */}
-      {params.finalVideoPath && Platform.OS !== "web" && (
-        <View style={styles.videoActionButtons}>
-          <TouchableOpacity
-            style={styles.shareToSocialButton}
-            onPress={handleShare}
-            activeOpacity={0.8}
-          >
-            <IconSymbol name="paperplane.fill" size={20} color="#1A1A1A" />
-            <Text style={[styles.shareToSocialText, { fontFamily: "Inter-Medium" }]}>
-              Share
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.saveToRollButton, isSaving && { opacity: 0.7 }]}
-            onPress={handleSaveVideo}
-            activeOpacity={0.8}
-            disabled={isSaving}
-          >
-            {isSaving ? (
-              <ActivityIndicator size="small" color="#C9A962" />
-            ) : (
-              <IconSymbol name="arrow.down.circle.fill" size={20} color="#C9A962" />
-            )}
-            <Text style={[styles.saveToRollText, { fontFamily: "Inter-Medium" }]}>
-              Save
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
 
       {/* All Steps List */}
       <View style={styles.stepsSection}>

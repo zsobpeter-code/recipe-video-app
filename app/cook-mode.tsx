@@ -409,13 +409,13 @@ export default function CookModeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Background Image - Sharper for better visibility */}
+      {/* Background Image - Sharp for better visibility */}
       {stepImage && (
         <Image
           source={{ uri: stepImage }}
           style={styles.backgroundImage}
           contentFit="cover"
-          blurRadius={5}
+          blurRadius={2}
         />
       )}
       
@@ -558,22 +558,16 @@ export default function CookModeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Bottom Bar */}
+        {/* Bottom Bar - Two buttons only */}
         <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           <SecondaryButton
-            title={isSaved ? "Saved" : "Save"}
-            onPress={handleSave}
-            disabled={isSaved || isSaving}
-            style={{ flex: 1 }}
-          />
-          <SecondaryButton
-            title="Photos"
+            title="Step Photos"
             subtitle="$1.99"
             onPress={handlePhotos}
             style={{ flex: 1 }}
           />
           <PrimaryButton
-            title={hasVideos ? "Watch Video" : "Video"}
+            title={hasVideos ? "Watch" : "Make Video"}
             subtitle={hasVideos ? undefined : "$4.99"}
             onPress={handleGenerateVideo}
             style={{ flex: 1 }}
