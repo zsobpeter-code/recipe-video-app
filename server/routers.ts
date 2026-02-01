@@ -8,6 +8,7 @@ import { storagePut } from "./storage";
 import { generateImage } from "./_core/imageGeneration";
 import { enrichRecipeForVideo, type EnrichedStep } from "./videoPromptEnricher";
 import { generateSingleStepPhoto } from "./stepPhotoService";
+import * as recipeDb from "./recipeDb";
 
 // Recipe analysis response schema
 const recipeSchema = z.object({
@@ -43,36 +44,8 @@ const recipeSchema = z.object({
 
 export type RecipeData = z.infer<typeof recipeSchema>;
 
-// Saved recipe type (from database)
-export interface SavedRecipe {
-  id: string;
-  userId: string;
-  dishName: string;
-  description: string;
-  cuisine: string | null;
-  category: string;
-  difficulty: string;
-  prepTime: number;
-  cookTime: number;
-  servings: number;
-  ingredients: string; // JSON string
-  steps: string; // JSON string
-  tags: string | null; // JSON string
-  imageUrl: string | null; // AI-generated or main display image
-  originalImageUrl: string | null; // Original captured/uploaded image (e.g., handwritten recipe)
-  generatedImageUrl: string | null; // AI-generated food photo
-  primaryImageUrl: string | null; // User's chosen primary image (original or generated)
-  stepImages: string | null; // JSON string of step images with HTTPS URLs
-  stepVideos: string | null; // JSON string of step videos with HTTPS URLs
-  finalVideoUrl: string | null; // URL of concatenated final video for sharing
-  isFavorite: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-// In-memory storage for recipes (since we're using Supabase directly from client)
-// This is a simplified approach - in production, you'd use proper database queries
-const recipes: Map<string, SavedRecipe> = new Map();
+// Re-export SavedRecipe type from recipeDb
+export type { SavedRecipe } from "./recipeDb";
 
 export const appRouter = router({
   system: systemRouter,
@@ -85,7 +58,7 @@ export const appRouter = router({
     }),
   }),
 
-  // Recipe operations
+  // Recipe operations - NOW USING SUPABASE DATABASE
   recipe: router({
     // Analyze image with Claude Vision
     analyze: publicProcedure
@@ -107,7 +80,10 @@ When analyzing an image:
 4. Estimate prep time, cook time, and servings
 5. Suggest difficulty level based on technique complexity
 
-IMPORTANT: The dishName field MUST be the actual name of the dish (e.g., "Spaghetti Carbonara", "Chicken Tikka Masala", "Beef Tacos"). NEVER use generic names like "Untitled Dish", "Unknown Dish", or "Food Item". If you cannot identify the dish, make your best educated guess based on the visible ingredients and cooking style.
+IMPORTANT RULES:
+- The dishName field MUST be the actual name of the dish (e.g., "Spaghetti Carbonara", "Chicken Tikka Masala", "Beef Tacos"). NEVER use generic names like "Untitled Dish", "Unknown Dish", or "Food Item".
+- Maximum 15 steps allowed. If the recipe needs more, combine related steps.
+- If you cannot identify the dish, make your best educated guess based on the visible ingredients and cooking style.
 
 Always return your response as valid JSON matching this exact structure:
 {
@@ -137,9 +113,6 @@ Always return your response as valid JSON matching this exact structure:
 
         let userContent = "Please analyze this food image and provide a complete recipe.";
         if (dishName) {
-          // When user provides a dish name, they are CORRECTING the AI's detection
-          // Generate a recipe specifically for that dish, not what's in the image
-          // IMPORTANT: Handle international dish names (Hungarian, Polish, Japanese, etc.)
           userContent = `IMPORTANT: The user has explicitly specified that this dish is called "${dishName}". 
 
 You MUST:
@@ -148,11 +121,7 @@ You MUST:
 3. The dish name in your response MUST be "${dishName}" exactly as provided
 4. Provide traditional, authentic ingredients and cooking methods for this specific dish
 5. If "${dishName}" is a well-known dish from any cuisine, provide its authentic recipe
-
-For example:
-- "Rakott krumpli" = Hungarian layered potato casserole with eggs and sausage
-- "Bigos" = Polish hunter's stew
-- "Okonomiyaki" = Japanese savory pancake
+6. Keep steps to maximum 15 - combine related steps if needed
 
 Generate the complete, authentic recipe for "${dishName}".`;
         }
@@ -191,6 +160,13 @@ Generate the complete, authentic recipe for "${dishName}".`;
             : JSON.stringify(rawContent);
 
           const recipeData = JSON.parse(content);
+          
+          // Enforce max 15 steps
+          if (recipeData.steps && recipeData.steps.length > 15) {
+            console.log(`[Recipe] Truncating steps from ${recipeData.steps.length} to 15`);
+            recipeData.steps = recipeData.steps.slice(0, 15);
+          }
+          
           const validatedRecipe = recipeSchema.parse(recipeData);
 
           return {
@@ -234,7 +210,7 @@ Generate the complete, authentic recipe for "${dishName}".`;
         }
       }),
 
-    // Save recipe to collection
+    // Save recipe to collection - NOW USES SUPABASE DATABASE
     save: publicProcedure
       .input(z.object({
         dishName: z.string(),
@@ -254,50 +230,12 @@ Generate the complete, authentic recipe for "${dishName}".`;
         stepVideos: z.string().optional(), // JSON string of step videos with HTTPS URLs
       }))
       .mutation(async ({ input }) => {
-        try {
-          const id = `recipe-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-          const now = new Date().toISOString();
-          
-          const recipe: SavedRecipe = {
-            id,
-            userId: "anonymous", // For now, we're not requiring auth
-            dishName: input.dishName,
-            description: input.description,
-            cuisine: input.cuisine || null,
-            category: input.category,
-            difficulty: input.difficulty,
-            prepTime: input.prepTime,
-            cookTime: input.cookTime,
-            servings: input.servings,
-            ingredients: input.ingredients,
-            steps: input.steps,
-            tags: input.tags || null,
-            imageUrl: input.imageUrl || null,
-            originalImageUrl: input.originalImageUrl || null,
-            generatedImageUrl: null,
-            primaryImageUrl: null,
-            stepImages: input.stepImages || null,
-            stepVideos: input.stepVideos || null,
-            finalVideoUrl: null,
-            isFavorite: false,
-            createdAt: now,
-            updatedAt: now,
-          };
-          
-          recipes.set(id, recipe);
-          
-          return { success: true, recipe };
-        } catch (error) {
-          console.error("Save recipe error:", error);
-          return {
-            success: false,
-            error: error instanceof Error ? error.message : "Failed to save recipe",
-            recipe: null,
-          };
-        }
+        console.log(`[Recipe] Saving recipe to database: ${input.dishName}`);
+        const result = await recipeDb.createRecipe(input);
+        return result;
       }),
 
-    // List all recipes
+    // List all recipes - NOW USES SUPABASE DATABASE
     list: publicProcedure
       .input(z.object({
         category: z.string().optional(),
@@ -305,199 +243,79 @@ Generate the complete, authentic recipe for "${dishName}".`;
         favoritesOnly: z.boolean().optional(),
       }).optional())
       .query(async ({ input }) => {
-        try {
-          let recipeList = Array.from(recipes.values());
-          
-          // Filter by category
-          if (input?.category && input.category !== "All") {
-            if (input.category === "Favorites") {
-              recipeList = recipeList.filter(r => r.isFavorite);
-            } else {
-              recipeList = recipeList.filter(r => r.category === input.category);
-            }
-          }
-          
-          // Filter by favorites
-          if (input?.favoritesOnly) {
-            recipeList = recipeList.filter(r => r.isFavorite);
-          }
-          
-          // Search by name
-          if (input?.search) {
-            const searchLower = input.search.toLowerCase();
-            recipeList = recipeList.filter(r => 
-              r.dishName.toLowerCase().includes(searchLower) ||
-              r.description.toLowerCase().includes(searchLower)
-            );
-          }
-          
-          // Sort by creation date (newest first)
-          recipeList.sort((a, b) => 
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          );
-          
-          return { success: true, recipes: recipeList };
-        } catch (error) {
-          console.error("List recipes error:", error);
-          return {
-            success: false,
-            error: error instanceof Error ? error.message : "Failed to list recipes",
-            recipes: [],
-          };
-        }
+        console.log(`[Recipe] Listing recipes from database`);
+        const result = await recipeDb.listRecipes({
+          category: input?.category,
+          search: input?.search,
+          favoritesOnly: input?.favoritesOnly,
+        });
+        return result;
       }),
 
-    // Get single recipe by ID
+    // Get single recipe by ID - NOW USES SUPABASE DATABASE
     get: publicProcedure
       .input(z.object({ id: z.string() }))
       .query(async ({ input }) => {
-        try {
-          const recipe = recipes.get(input.id);
-          if (!recipe) {
-            return { success: false, error: "Recipe not found", recipe: null };
-          }
-          return { success: true, recipe };
-        } catch (error) {
-          console.error("Get recipe error:", error);
-          return {
-            success: false,
-            error: error instanceof Error ? error.message : "Failed to get recipe",
-            recipe: null,
-          };
-        }
+        console.log(`[Recipe] Getting recipe from database: ${input.id}`);
+        const result = await recipeDb.getRecipe(input.id);
+        return result;
       }),
 
-    // Toggle favorite status
+    // Toggle favorite status - NOW USES SUPABASE DATABASE
     toggleFavorite: publicProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ input }) => {
-        try {
-          const recipe = recipes.get(input.id);
-          if (!recipe) {
-            return { success: false, error: "Recipe not found" };
-          }
-          
-          recipe.isFavorite = !recipe.isFavorite;
-          recipe.updatedAt = new Date().toISOString();
-          recipes.set(input.id, recipe);
-          
-          return { success: true, isFavorite: recipe.isFavorite };
-        } catch (error) {
-          console.error("Toggle favorite error:", error);
-          return {
-            success: false,
-            error: error instanceof Error ? error.message : "Failed to toggle favorite",
-          };
-        }
+        console.log(`[Recipe] Toggling favorite in database: ${input.id}`);
+        const result = await recipeDb.toggleFavorite(input.id);
+        return result;
       }),
 
-    // Delete recipe
+    // Delete recipe - NOW USES SUPABASE DATABASE
     delete: publicProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ input }) => {
-        try {
-          const recipe = recipes.get(input.id);
-          if (!recipe) {
-            return { success: false, error: "Recipe not found" };
-          }
-          
-          recipes.delete(input.id);
-          
-          return { success: true };
-        } catch (error) {
-          console.error("Delete recipe error:", error);
-          return {
-            success: false,
-            error: error instanceof Error ? error.message : "Failed to delete recipe",
-          };
-        }
+        console.log(`[Recipe] Deleting recipe from database: ${input.id}`);
+        const result = await recipeDb.deleteRecipe(input.id);
+        return result;
       }),
 
-    // Update step images for a recipe
+    // Update step images for a recipe - NOW USES SUPABASE DATABASE
     updateStepImages: publicProcedure
       .input(z.object({
         recipeId: z.string().describe("Recipe ID to update"),
         stepImages: z.string().describe("JSON string of step images with HTTPS URLs"),
       }))
       .mutation(async ({ input }) => {
-        try {
-          const recipe = recipes.get(input.recipeId);
-          if (!recipe) {
-            return { success: false, error: "Recipe not found" };
-          }
-          
-          recipe.stepImages = input.stepImages;
-          recipe.updatedAt = new Date().toISOString();
-          recipes.set(input.recipeId, recipe);
-          
-          console.log(`[Recipe] Updated step images for ${input.recipeId}`);
-          return { success: true };
-        } catch (error) {
-          console.error("Update step images error:", error);
-          return {
-            success: false,
-            error: error instanceof Error ? error.message : "Failed to update step images",
-          };
-        }
+        console.log(`[Recipe] Updating step images in database: ${input.recipeId}`);
+        const result = await recipeDb.updateStepImages(input.recipeId, input.stepImages);
+        return result;
       }),
 
-    // Update step videos for a recipe
+    // Update step videos for a recipe - NOW USES SUPABASE DATABASE
     updateStepVideos: publicProcedure
       .input(z.object({
         recipeId: z.string().describe("Recipe ID to update"),
         stepVideos: z.string().describe("JSON string of step videos with HTTPS URLs"),
       }))
       .mutation(async ({ input }) => {
-        try {
-          const recipe = recipes.get(input.recipeId);
-          if (!recipe) {
-            return { success: false, error: "Recipe not found" };
-          }
-          
-          recipe.stepVideos = input.stepVideos;
-          recipe.updatedAt = new Date().toISOString();
-          recipes.set(input.recipeId, recipe);
-          
-          console.log(`[Recipe] Updated step videos for ${input.recipeId}`);
-          return { success: true };
-        } catch (error) {
-          console.error("Update step videos error:", error);
-          return {
-            success: false,
-            error: error instanceof Error ? error.message : "Failed to update step videos",
-          };
-        }
+        console.log(`[Recipe] Updating step videos in database: ${input.recipeId}`);
+        const result = await recipeDb.updateStepVideos(input.recipeId, input.stepVideos);
+        return result;
       }),
 
-    // Update final video URL for a recipe (concatenated video for sharing)
+    // Update final video URL for a recipe - NOW USES SUPABASE DATABASE
     updateFinalVideoUrl: publicProcedure
       .input(z.object({
         recipeId: z.string().describe("Recipe ID to update"),
         finalVideoUrl: z.string().describe("URL of the concatenated final video"),
       }))
       .mutation(async ({ input }) => {
-        try {
-          const recipe = recipes.get(input.recipeId);
-          if (!recipe) {
-            return { success: false, error: "Recipe not found" };
-          }
-          
-          recipe.finalVideoUrl = input.finalVideoUrl;
-          recipe.updatedAt = new Date().toISOString();
-          recipes.set(input.recipeId, recipe);
-          
-          console.log(`[Recipe] Updated final video URL for ${input.recipeId}`);
-          return { success: true };
-        } catch (error) {
-          console.error("Update final video URL error:", error);
-          return {
-            success: false,
-            error: error instanceof Error ? error.message : "Failed to update final video URL",
-          };
-        }
+        console.log(`[Recipe] Updating final video URL in database: ${input.recipeId}`);
+        const result = await recipeDb.updateFinalVideoUrl(input.recipeId, input.finalVideoUrl);
+        return result;
       }),
 
-    // Update primary image selection for a recipe
+    // Update primary image selection for a recipe - NOW USES SUPABASE DATABASE
     updatePrimaryImage: publicProcedure
       .input(z.object({
         recipeId: z.string().describe("Recipe ID to update"),
@@ -505,53 +323,69 @@ Generate the complete, authentic recipe for "${dishName}".`;
         imageType: z.enum(["original", "generated"]).describe("Type of image selected"),
       }))
       .mutation(async ({ input }) => {
-        try {
-          const recipe = recipes.get(input.recipeId);
-          if (!recipe) {
-            return { success: false, error: "Recipe not found" };
-          }
-          
-          recipe.primaryImageUrl = input.primaryImageUrl;
-          recipe.updatedAt = new Date().toISOString();
-          recipes.set(input.recipeId, recipe);
-          
-          console.log(`[Recipe] Updated primary image for ${input.recipeId} to ${input.imageType}`);
-          return { success: true };
-        } catch (error) {
-          console.error("Update primary image error:", error);
-          return {
-            success: false,
-            error: error instanceof Error ? error.message : "Failed to update primary image",
-          };
-        }
+        console.log(`[Recipe] Updating primary image in database: ${input.recipeId}`);
+        const result = await recipeDb.updatePrimaryImage(input.recipeId, input.primaryImageUrl);
+        return result;
       }),
 
-    // Update generated image URL for a recipe
+    // Update generated image URL for a recipe - NOW USES SUPABASE DATABASE
     updateGeneratedImage: publicProcedure
       .input(z.object({
         recipeId: z.string().describe("Recipe ID to update"),
         generatedImageUrl: z.string().describe("URL of the AI-generated image"),
       }))
       .mutation(async ({ input }) => {
-        try {
-          const recipe = recipes.get(input.recipeId);
-          if (!recipe) {
-            return { success: false, error: "Recipe not found" };
-          }
-          
-          recipe.generatedImageUrl = input.generatedImageUrl;
-          recipe.updatedAt = new Date().toISOString();
-          recipes.set(input.recipeId, recipe);
-          
-          console.log(`[Recipe] Updated generated image for ${input.recipeId}`);
-          return { success: true };
-        } catch (error) {
-          console.error("Update generated image error:", error);
-          return {
-            success: false,
-            error: error instanceof Error ? error.message : "Failed to update generated image",
-          };
-        }
+        console.log(`[Recipe] Updating generated image in database: ${input.recipeId}`);
+        const result = await recipeDb.updateGeneratedImage(input.recipeId, input.generatedImageUrl);
+        return result;
+      }),
+
+    // Check if step images are cached for a recipe
+    hasStepImages: publicProcedure
+      .input(z.object({ recipeId: z.string() }))
+      .query(async ({ input }) => {
+        const hasCached = await recipeDb.hasStepImages(input.recipeId);
+        return { hasCached };
+      }),
+
+    // Check if step videos are cached for a recipe
+    hasStepVideos: publicProcedure
+      .input(z.object({ recipeId: z.string() }))
+      .query(async ({ input }) => {
+        const hasCached = await recipeDb.hasStepVideos(input.recipeId);
+        return { hasCached };
+      }),
+
+    // Check if final video is cached for a recipe
+    hasFinalVideo: publicProcedure
+      .input(z.object({ recipeId: z.string() }))
+      .query(async ({ input }) => {
+        const hasCached = await recipeDb.hasFinalVideo(input.recipeId);
+        return { hasCached };
+      }),
+
+    // Get cached step images for a recipe
+    getCachedStepImages: publicProcedure
+      .input(z.object({ recipeId: z.string() }))
+      .query(async ({ input }) => {
+        const cached = await recipeDb.getCachedStepImages(input.recipeId);
+        return { cached };
+      }),
+
+    // Get cached step videos for a recipe
+    getCachedStepVideos: publicProcedure
+      .input(z.object({ recipeId: z.string() }))
+      .query(async ({ input }) => {
+        const cached = await recipeDb.getCachedStepVideos(input.recipeId);
+        return { cached };
+      }),
+
+    // Get cached final video URL for a recipe
+    getCachedFinalVideoUrl: publicProcedure
+      .input(z.object({ recipeId: z.string() }))
+      .query(async ({ input }) => {
+        const cached = await recipeDb.getCachedFinalVideoUrl(input.recipeId);
+        return { cached };
       }),
 
     // Generate AI food image for a dish
@@ -646,9 +480,16 @@ Generate the complete, authentic recipe for "${dishName}".`;
       }))
       .mutation(async ({ input }) => {
         try {
+          // Enforce max 15 steps
+          let steps = input.steps;
+          if (steps.length > 15) {
+            console.log(`[Recipe] Truncating steps from ${steps.length} to 15 for video enrichment`);
+            steps = steps.slice(0, 15);
+          }
+
           const enrichedSteps = await enrichRecipeForVideo({
             title: input.title,
-            steps: input.steps,
+            steps,
           });
 
           return {

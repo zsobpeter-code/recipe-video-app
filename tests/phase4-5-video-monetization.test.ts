@@ -86,17 +86,16 @@ describe("Phase 4 & 5: Video Generation & Monetization", () => {
       const paywallPath = path.join(projectRoot, "app/paywall.tsx");
       const content = fs.readFileSync(paywallPath, "utf-8");
       
-      // Video pricing
+      // Video pricing (updated for RevenueCat packages)
       expect(content).toContain("VIDEO_PRICING_OPTIONS");
-      expect(content).toContain("$4.99");
-      expect(content).toContain("$17.49");
-      expect(content).toContain("$29.99");
-      // Step photos pricing
+      expect(content).toContain("$4.99"); // Video bundle small
+      expect(content).toContain("$12.99"); // Video bundle large
+      expect(content).toContain("$9.99/mo"); // Pro monthly
+      // Step photos pricing (updated for RevenueCat packages)
       expect(content).toContain("STEP_PHOTOS_PRICING_OPTIONS");
-      expect(content).toContain("$1.99");
-      expect(content).toContain("$7.49");
-      expect(content).toContain("$9.99");
-      expect(content).toContain("Best Value");
+      expect(content).toContain("$2.99"); // Photo bundle
+      expect(content).toContain("$79.99/yr"); // Pro annual
+      expect(content).toContain("BEST VALUE");
     });
 
     it("should have continue button and restore purchases", () => {

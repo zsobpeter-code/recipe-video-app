@@ -33,6 +33,7 @@ import {
 
 import { trpc, createTRPCClient } from "@/lib/trpc";
 import { AuthProvider } from "@/lib/auth-provider";
+import { RevenueCatProvider } from "@/lib/revenuecat";
 import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-runtime";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
@@ -121,8 +122,9 @@ export default function RootLayout() {
   const content = (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
-        <trpc.Provider client={trpcClient} queryClient={queryClient}>
-          <QueryClientProvider client={queryClient}>
+        <RevenueCatProvider>
+          <trpc.Provider client={trpcClient} queryClient={queryClient}>
+            <QueryClientProvider client={queryClient}>
           {/* Default to hiding native headers so raw route segments don't appear (e.g. "(tabs)", "products/[id]"). */}
           {/* If a screen needs the native header, explicitly enable it and set a human title via Stack.Screen options. */}
           {/* in order for ios apps tab switching to work properly, use presentation: "fullScreenModal" for login page, whenever you decide to use presentation: "modal*/}
@@ -140,9 +142,10 @@ export default function RootLayout() {
             <Stack.Screen name="video-generation" options={{ presentation: "fullScreenModal", gestureEnabled: false }} />
             <Stack.Screen name="video-player" options={{ presentation: "card" }} />
           </Stack>
-            <StatusBar style="light" />
-          </QueryClientProvider>
-        </trpc.Provider>
+              <StatusBar style="light" />
+            </QueryClientProvider>
+          </trpc.Provider>
+        </RevenueCatProvider>
       </AuthProvider>
     </GestureHandlerRootView>
   );

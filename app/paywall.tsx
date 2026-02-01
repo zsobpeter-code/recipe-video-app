@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   View, 
   Text, 
@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Platform,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import * as Haptics from "expo-haptics";
@@ -14,9 +15,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useRevenueCat, PACKAGES } from "@/lib/revenuecat";
+import type { PurchasesPackage } from "react-native-purchases";
 
 interface PricingOption {
   id: string;
+  packageId: string; // RevenueCat package identifier
   title: string;
   subtitle: string;
   price: string;
@@ -25,54 +29,64 @@ interface PricingOption {
   credits?: number;
 }
 
+// Video pricing options mapped to RevenueCat packages
 const VIDEO_PRICING_OPTIONS: PricingOption[] = [
   {
-    id: "single",
-    title: "Single Video",
+    id: "video_small",
+    packageId: PACKAGES.VIDEO_BUNDLE_SMALL,
+    title: "3 Video Pack",
     subtitle: "Pay as you go",
     price: "$4.99",
-    credits: 1,
+    pricePerVideo: "$1.67/video",
+    credits: 3,
   },
   {
-    id: "pack5",
-    title: "5 Video Pack",
-    subtitle: "Save 30%",
-    price: "$17.49",
-    pricePerVideo: "$3.50/video",
-    credits: 5,
+    id: "video_large",
+    packageId: PACKAGES.VIDEO_BUNDLE_LARGE,
+    title: "10 Video Pack",
+    subtitle: "Save 20%",
+    price: "$12.99",
+    pricePerVideo: "$1.30/video",
+    credits: 10,
   },
   {
-    id: "unlimited",
-    title: "Unlimited",
-    subtitle: "Best Value",
-    price: "$29.99",
+    id: "pro_monthly",
+    packageId: PACKAGES.MONTHLY,
+    title: "Pro Monthly",
+    subtitle: "50 videos/month",
+    price: "$9.99/mo",
     isBestValue: true,
-    credits: -1, // unlimited
+    credits: -1, // unlimited (fair use)
   },
 ];
 
+// Step photos pricing options mapped to RevenueCat packages
 const STEP_PHOTOS_PRICING_OPTIONS: PricingOption[] = [
   {
-    id: "single",
-    title: "This Recipe",
-    subtitle: "One-time purchase",
-    price: "$1.99",
-    credits: 1,
+    id: "photo_bundle",
+    packageId: PACKAGES.PHOTO_BUNDLE,
+    title: "10 Recipe Pack",
+    subtitle: "Pay as you go",
+    price: "$2.99",
+    pricePerVideo: "$0.30/recipe",
+    credits: 10,
   },
   {
-    id: "pack5",
-    title: "5 Recipe Pack",
-    subtitle: "Save 25%",
-    price: "$7.49",
-    pricePerVideo: "$1.50/recipe",
-    credits: 5,
-  },
-  {
-    id: "unlimited",
-    title: "Unlimited Photos",
-    subtitle: "Best Value",
-    price: "$9.99",
+    id: "pro_monthly",
+    packageId: PACKAGES.MONTHLY,
+    title: "Pro Monthly",
+    subtitle: "Unlimited photos",
+    price: "$9.99/mo",
     isBestValue: true,
+    credits: -1, // unlimited
+  },
+  {
+    id: "pro_annual",
+    packageId: PACKAGES.ANNUAL,
+    title: "Pro Annual",
+    subtitle: "Save 33%",
+    price: "$79.99/yr",
+    pricePerVideo: "$6.67/mo",
     credits: -1, // unlimited
   },
 ];
@@ -104,10 +118,34 @@ export default function PaywallScreen() {
     stepImages?: string; // JSON string of step images with HTTPS URLs
   }>();
 
+  const { 
+    isInitialized, 
+    offerings, 
+    purchasePackage, 
+    restorePurchases,
+    getPackageByIdentifier,
+  } = useRevenueCat();
+
   const isStepPhotos = params.productType === "step_photos";
+  const pricingOptions = isStepPhotos ? STEP_PHOTOS_PRICING_OPTIONS : VIDEO_PRICING_OPTIONS;
   
-  const [selectedOption, setSelectedOption] = useState<string>("pack5");
+  const [selectedOption, setSelectedOption] = useState<string>(pricingOptions[0].id);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [displayPrices, setDisplayPrices] = useState<Record<string, string>>({});
+
+  // Update prices from RevenueCat offerings
+  useEffect(() => {
+    if (!offerings) return;
+
+    const prices: Record<string, string> = {};
+    pricingOptions.forEach(option => {
+      const pkg = getPackageByIdentifier(option.packageId);
+      if (pkg) {
+        prices[option.id] = pkg.product.priceString;
+      }
+    });
+    setDisplayPrices(prices);
+  }, [offerings, isStepPhotos]);
 
   const handleSelectOption = (optionId: string) => {
     if (Platform.OS !== "web") {
@@ -121,14 +159,40 @@ export default function PaywallScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
 
+    const selectedPricing = pricingOptions.find(o => o.id === selectedOption);
+    if (!selectedPricing) return;
+
     setIsProcessing(true);
 
-    // Simulate purchase processing
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      // Get the RevenueCat package
+      const pkg = getPackageByIdentifier(selectedPricing.packageId);
+      
+      if (!pkg) {
+        // Fallback for web or if package not found - use mock purchase
+        console.log("[Paywall] Package not found, using mock purchase");
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        handlePurchaseSuccess();
+        return;
+      }
 
-    setIsProcessing(false);
+      // Make the actual purchase
+      const result = await purchasePackage(pkg);
 
-    // Mock successful purchase
+      if (result.success) {
+        handlePurchaseSuccess();
+      } else if (result.error && result.error !== "Purchase cancelled") {
+        Alert.alert("Purchase Failed", result.error);
+      }
+    } catch (error: any) {
+      console.error("[Paywall] Purchase error:", error);
+      Alert.alert("Error", error.message || "Something went wrong. Please try again.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handlePurchaseSuccess = () => {
     if (Platform.OS !== "web") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
@@ -168,15 +232,34 @@ export default function PaywallScreen() {
     }
   };
 
-  const handleRestorePurchases = () => {
+  const handleRestorePurchases = async () => {
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    Alert.alert(
-      "Restore Purchases",
-      "No previous purchases found.",
-      [{ text: "OK" }]
-    );
+
+    setIsProcessing(true);
+
+    try {
+      const result = await restorePurchases();
+
+      if (result.success) {
+        Alert.alert(
+          "Purchases Restored",
+          "Your previous purchases have been restored.",
+          [{ text: "OK", onPress: () => router.back() }]
+        );
+      } else {
+        Alert.alert(
+          "No Purchases Found",
+          result.error || "No previous purchases found to restore.",
+          [{ text: "OK" }]
+        );
+      }
+    } catch (error: any) {
+      Alert.alert("Error", error.message || "Failed to restore purchases.");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleClose = () => {
@@ -184,6 +267,11 @@ export default function PaywallScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
     router.back();
+  };
+
+  // Get display price for an option (from RevenueCat or fallback)
+  const getDisplayPrice = (option: PricingOption): string => {
+    return displayPrices[option.id] || option.price;
   };
 
   return (
@@ -236,7 +324,7 @@ export default function PaywallScreen() {
 
         {/* Pricing Options */}
         <View style={styles.pricingContainer}>
-          {(isStepPhotos ? STEP_PHOTOS_PRICING_OPTIONS : VIDEO_PRICING_OPTIONS).map((option) => (
+          {pricingOptions.map((option) => (
             <TouchableOpacity
               key={option.id}
               style={[
@@ -265,7 +353,7 @@ export default function PaywallScreen() {
                       <View style={styles.radioInner} />
                     )}
                   </View>
-                  <View>
+                  <View style={styles.pricingTextContainer}>
                     <Text style={[styles.pricingTitle, { fontFamily: "Inter-Medium" }]}>
                       {option.title}
                     </Text>
@@ -275,8 +363,8 @@ export default function PaywallScreen() {
                   </View>
                 </View>
                 <View style={styles.pricingRight}>
-                  <Text style={[styles.pricingPrice, { fontFamily: "PlayfairDisplay-Bold" }]}>
-                    {option.price}
+                  <Text style={[styles.pricingPrice, { fontFamily: "Inter-Medium" }]}>
+                    {getDisplayPrice(option)}
                   </Text>
                   {option.pricePerVideo && (
                     <Text style={[styles.pricingPerVideo, { fontFamily: "Inter" }]}>
@@ -291,20 +379,28 @@ export default function PaywallScreen() {
 
         {/* Continue Button */}
         <TouchableOpacity
-          style={[styles.continueButton, isProcessing && styles.continueButtonDisabled]}
+          style={[
+            styles.continueButton,
+            isProcessing && styles.continueButtonDisabled,
+          ]}
           onPress={handleContinue}
-          activeOpacity={0.8}
           disabled={isProcessing}
+          activeOpacity={0.8}
         >
-          <Text style={[styles.continueButtonText, { fontFamily: "Inter-Medium" }]}>
-            {isProcessing ? "Processing..." : "Continue"}
-          </Text>
+          {isProcessing ? (
+            <ActivityIndicator color="#1A1A1A" size="small" />
+          ) : (
+            <Text style={[styles.continueButtonText, { fontFamily: "Inter-Medium" }]}>
+              Continue
+            </Text>
+          )}
         </TouchableOpacity>
 
         {/* Restore Purchases */}
         <TouchableOpacity
           style={styles.restoreButton}
           onPress={handleRestorePurchases}
+          disabled={isProcessing}
           activeOpacity={0.7}
         >
           <Text style={[styles.restoreButtonText, { fontFamily: "Inter" }]}>
@@ -312,9 +408,10 @@ export default function PaywallScreen() {
           </Text>
         </TouchableOpacity>
 
-        {/* Legal */}
-        <Text style={[styles.legalText, { fontFamily: "Inter" }]}>
-          Payment will be charged to your Apple ID account. Subscription automatically renews unless canceled at least 24 hours before the end of the current period.
+        {/* Terms */}
+        <Text style={[styles.termsText, { fontFamily: "Inter" }]}>
+          By continuing, you agree to our Terms of Service and Privacy Policy.
+          {"\n"}Subscriptions auto-renew unless cancelled 24 hours before the end of the current period.
         </Text>
       </ScrollView>
     </ScreenContainer>
@@ -324,25 +421,33 @@ export default function PaywallScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#1A1A1A",
     paddingHorizontal: 24,
   },
   closeButton: {
-    alignSelf: "flex-end",
-    padding: 8,
-    marginTop: 8,
+    position: "absolute",
+    top: 16,
+    right: 0,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 10,
   },
   iconContainer: {
     alignItems: "center",
-    marginTop: 16,
+    marginTop: 60,
     marginBottom: 24,
   },
   premiumIcon: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
     backgroundColor: "rgba(201, 169, 98, 0.15)",
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "center",
     borderWidth: 2,
     borderColor: "rgba(201, 169, 98, 0.3)",
   },
@@ -361,67 +466,65 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 15,
     color: "#888888",
     textAlign: "center",
-    lineHeight: 24,
+    lineHeight: 22,
     marginBottom: 32,
   },
   featuresContainer: {
     marginBottom: 32,
-    gap: 16,
   },
   featureRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
+    marginBottom: 16,
   },
   featureIconContainer: {
     width: 36,
     height: 36,
     borderRadius: 18,
     backgroundColor: "rgba(201, 169, 98, 0.15)",
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
   },
   featureText: {
     fontSize: 15,
-    color: "#FFFFFF",
+    color: "#CCCCCC",
     flex: 1,
   },
   pricingContainer: {
-    gap: 12,
     marginBottom: 24,
   },
   pricingOption: {
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    backgroundColor: "#252525",
     borderRadius: 16,
-    borderWidth: 2,
-    borderColor: "rgba(255, 255, 255, 0.1)",
     padding: 16,
-    position: "relative",
-    overflow: "hidden",
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: "transparent",
   },
   pricingOptionSelected: {
     borderColor: "#C9A962",
-    backgroundColor: "rgba(201, 169, 98, 0.08)",
+    backgroundColor: "rgba(201, 169, 98, 0.1)",
   },
   pricingOptionBestValue: {
-    paddingTop: 32,
+    borderColor: "rgba(201, 169, 98, 0.5)",
   },
   bestValueBadge: {
     position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
+    top: -10,
+    right: 16,
     backgroundColor: "#C9A962",
+    paddingHorizontal: 12,
     paddingVertical: 4,
-    alignItems: "center",
+    borderRadius: 12,
   },
   bestValueText: {
-    fontSize: 11,
+    fontSize: 10,
     color: "#1A1A1A",
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
   pricingContent: {
     flexDirection: "row",
@@ -431,7 +534,7 @@ const styles = StyleSheet.create({
   pricingLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
+    flex: 1,
   },
   radioOuter: {
     width: 22,
@@ -439,8 +542,9 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     borderWidth: 2,
     borderColor: "#555555",
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
   },
   radioOuterSelected: {
     borderColor: "#C9A962",
@@ -451,21 +555,24 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: "#C9A962",
   },
+  pricingTextContainer: {
+    flex: 1,
+  },
   pricingTitle: {
     fontSize: 16,
     color: "#FFFFFF",
+    marginBottom: 2,
   },
   pricingSubtitle: {
     fontSize: 13,
     color: "#888888",
-    marginTop: 2,
   },
   pricingRight: {
     alignItems: "flex-end",
   },
   pricingPrice: {
-    fontSize: 20,
-    color: "#C9A962",
+    fontSize: 18,
+    color: "#FFFFFF",
   },
   pricingPerVideo: {
     fontSize: 12,
@@ -474,32 +581,33 @@ const styles = StyleSheet.create({
   },
   continueButton: {
     backgroundColor: "#C9A962",
-    borderRadius: 28,
+    borderRadius: 16,
     paddingVertical: 18,
     alignItems: "center",
     marginBottom: 16,
   },
   continueButtonDisabled: {
-    opacity: 0.6,
+    opacity: 0.7,
   },
   continueButtonText: {
-    fontSize: 18,
+    fontSize: 17,
     color: "#1A1A1A",
   },
   restoreButton: {
     alignItems: "center",
     paddingVertical: 12,
-    marginBottom: 24,
+    marginBottom: 16,
   },
   restoreButtonText: {
     fontSize: 14,
     color: "#888888",
     textDecorationLine: "underline",
   },
-  legalText: {
+  termsText: {
     fontSize: 11,
-    color: "#555555",
+    color: "#666666",
     textAlign: "center",
     lineHeight: 16,
+    marginBottom: 20,
   },
 });

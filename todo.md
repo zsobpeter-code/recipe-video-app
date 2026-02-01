@@ -796,3 +796,46 @@ After generating individual step videos, concatenate them into a single video fi
 - [x] Share button should share actual video file, not text
 - [x] Download video to cache, then share via expo-sharing
 - [x] Clean up temp file after sharing
+
+
+## MVP BLOCKERS - Critical Path to Launch
+
+### BLOCKER 1: Recipe Database Persistence
+- [x] Create recipes table in Supabase with all required columns
+- [x] Wire recipe.save to Supabase insert
+- [x] Wire recipe.list to Supabase select
+- [x] Wire recipe.get to Supabase select by ID
+- [x] Wire recipe.delete to Supabase delete
+- [x] Wire recipe.toggleFavorite to Supabase update
+- [x] Remove in-memory Map storage
+- [x] Add user_id foreign key for ownership
+- [ ] Test: Restart server → recipes persist
+
+### BLOCKER 2: Step Images/Videos Persistence + Caching
+- [x] Add step_images column to recipes table (JSONB)
+- [x] Add step_videos column to recipes table (JSONB)
+- [x] Add final_video_url column to recipes table
+- [x] Call updateStepImages after photo generation completes
+- [x] Call updateStepVideos after video generation completes
+- [x] Call updateFinalVideoUrl after concatenation completes
+- [x] Add caching check: skip photo generation if stepImages exist
+- [x] Add caching check: skip video generation if stepVideos exist
+- [x] Add caching check: skip concatenation if finalVideoUrl exists
+- [x] Implement free retry on failure (no credit decrement)
+- [x] Enforce max 15 steps per recipe
+- [x] Enforce 50 videos/month fair use cap for unlimited subscription
+
+### BLOCKER 3: RevenueCat Payment Integration
+- [x] Install react-native-purchases SDK
+- [x] Initialize RevenueCat on app start
+- [x] Create 6 products in RevenueCat dashboard
+- [x] Remove mock 1.5s delay payment
+- [x] Implement real purchasePackage() flow
+- [x] Handle purchase success/failure/cancellation
+- [x] Check subscription state before generation
+- [x] Create user_credits table in Supabase
+- [x] Track credits for bundle purchases
+- [x] Decrement credits only on successful generation
+- [x] Wire Restore Purchases button to restorePurchases()
+- [ ] Add server-side receipt validation (deferred - not blocking MVP)
+

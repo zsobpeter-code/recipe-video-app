@@ -54,6 +54,16 @@ export default function VideoGenerationScreen() {
   const generateStepVideoMutation = trpc.recipe.generateStepVideo.useMutation();
   const updateStepVideosMutation = trpc.recipe.updateStepVideos.useMutation();
   const updateFinalVideoUrlMutation = trpc.recipe.updateFinalVideoUrl.useMutation();
+  
+  // tRPC queries for caching
+  const { data: cachedStepVideosData } = trpc.recipe.getCachedStepVideos.useQuery(
+    { recipeId: params.recipeId || "" },
+    { enabled: !!params.recipeId }
+  );
+  const { data: cachedFinalVideoData } = trpc.recipe.getCachedFinalVideoUrl.useQuery(
+    { recipeId: params.recipeId || "" },
+    { enabled: !!params.recipeId }
+  );
 
   // Animations
   const spinValue = useRef(new Animated.Value(0)).current;
@@ -142,24 +152,63 @@ export default function VideoGenerationScreen() {
 
         setTotalSteps(steps.length);
         
-        // Check if videos are already cached
+        // Check if videos are already cached in database
+        if (cachedStepVideosData?.cached && Array.isArray(cachedStepVideosData.cached) && cachedStepVideosData.cached.length > 0) {
+          const dbCachedVideos = cachedStepVideosData.cached.map((v: any, idx: number) => ({
+            stepIndex: v.stepIndex ?? idx,
+            videoUrl: v.videoUrl || "",
+            status: v.videoUrl ? "completed" as const : "pending" as const,
+          }));
+          
+          if (dbCachedVideos.every((v: StepVideo) => v.videoUrl && v.status === "completed")) {
+            console.log("[VideoGeneration] Using DB cached videos:", dbCachedVideos.length);
+            setStepVideos(dbCachedVideos);
+            setCurrentStepIndex(steps.length - 1);
+            setStatusMessage("Videos ready! (cached)");
+            
+            Animated.timing(progressValue, {
+              toValue: 100,
+              duration: 500,
+              useNativeDriver: false,
+            }).start();
+            
+            setIsComplete(true);
+            if (Platform.OS !== "web") {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            }
+            
+            setTimeout(() => {
+              router.replace({
+                pathname: "/video-player" as any,
+                params: {
+                  dishName: params.dishName,
+                  recipeData: params.recipeData,
+                  imageUri: params.imageUri,
+                  stepVideos: JSON.stringify(dbCachedVideos),
+                  finalVideoUrl: cachedFinalVideoData?.cached || undefined,
+                },
+              });
+            }, 1000);
+            return;
+          }
+        }
+        
+        // Check if videos are passed in params (fallback)
         if (params.cachedStepVideos) {
           try {
             const cachedVideos = JSON.parse(params.cachedStepVideos) as StepVideo[];
             if (cachedVideos.length > 0 && cachedVideos.every(v => v.videoUrl && v.status === "completed")) {
-              console.log("[VideoGeneration] Using cached videos:", cachedVideos.length);
+              console.log("[VideoGeneration] Using param cached videos:", cachedVideos.length);
               setStepVideos(cachedVideos);
               setCurrentStepIndex(steps.length - 1);
               setStatusMessage("Videos ready!");
               
-              // Update progress to 100%
               Animated.timing(progressValue, {
                 toValue: 100,
                 duration: 500,
                 useNativeDriver: false,
               }).start();
               
-              // Mark as complete and navigate
               setIsComplete(true);
               if (Platform.OS !== "web") {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
