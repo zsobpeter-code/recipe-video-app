@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
+import * as Linking from "expo-linking";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenContainer } from "@/components/screen-container";
@@ -227,12 +228,12 @@ export default function ProfileScreen() {
             <SettingsItem
               icon="doc.text.fill"
               label="Terms of Service"
-              onPress={() => showComingSoon("Terms of Service")}
+              onPress={() => Linking.openURL("https://dishcraft.ai/terms.html")}
             />
             <SettingsItem
               icon="lock.fill"
               label="Privacy Policy"
-              onPress={() => showComingSoon("Privacy Policy")}
+              onPress={() => Linking.openURL("https://dishcraft.ai/privacy.html")}
             />
           </View>
         </View>

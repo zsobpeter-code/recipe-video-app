@@ -881,3 +881,12 @@ Remove old packages ($rc_monthly, $rc_annual, $rc_custom_*) and create:
 - [x] Update lib/revenuecat.tsx with new products
 - [x] Update app/paywall.tsx with new pricing options
 - [ ] Update tests if needed
+
+
+## Static Pages - Privacy & Terms
+
+- [x] Create /public/privacy.html with privacy policy content
+- [x] Create /public/terms.html with terms of service content
+- [x] Update Profile screen Privacy Policy link to https://dishcraft.ai/privacy.html
+- [x] Update Profile screen Terms of Service link to https://dishcraft.ai/terms.html
+- [ ] Save checkpoint for deployment
