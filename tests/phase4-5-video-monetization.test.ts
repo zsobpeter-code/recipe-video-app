@@ -86,15 +86,16 @@ describe("Phase 4 & 5: Video Generation & Monetization", () => {
       const paywallPath = path.join(projectRoot, "app/paywall.tsx");
       const content = fs.readFileSync(paywallPath, "utf-8");
       
-      // Video pricing (updated for RevenueCat packages)
+      // Video pricing (Dishcraft pricing)
       expect(content).toContain("VIDEO_PRICING_OPTIONS");
-      expect(content).toContain("$4.99"); // Video bundle small
-      expect(content).toContain("$12.99"); // Video bundle large
-      expect(content).toContain("$9.99/mo"); // Pro monthly
-      // Step photos pricing (updated for RevenueCat packages)
+      expect(content).toContain("$4.99"); // Video single
+      expect(content).toContain("$17.49"); // Video pack 5
+      expect(content).toContain("$29.99/mo"); // Unlimited videos
+      // Step photos pricing (Dishcraft pricing)
       expect(content).toContain("STEP_PHOTOS_PRICING_OPTIONS");
-      expect(content).toContain("$2.99"); // Photo bundle
-      expect(content).toContain("$79.99/yr"); // Pro annual
+      expect(content).toContain("$1.99"); // Step photos single
+      expect(content).toContain("$7.49"); // Photo pack 5
+      expect(content).toContain("$9.99/mo"); // Unlimited photos
       expect(content).toContain("BEST VALUE");
     });
 

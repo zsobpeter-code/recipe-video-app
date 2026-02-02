@@ -850,3 +850,34 @@ After generating individual step videos, concatenate them into a single video fi
 - [x] Keep bundle ID unchanged
 - [x] Keep Supabase project name unchanged
 - [x] Keep file/folder names unchanged
+
+## CRITICAL FIXES - Bundle ID & RevenueCat Pricing
+
+### Fix 1: Bundle ID Update
+- [x] Change bundle ID from space.manus.* to com.dishcraft.app
+- [x] Update app.config.ts ios.bundleIdentifier
+- [x] Update app.config.ts android.package
+- [x] Update RevenueCat iOS app bundle ID
+- [x] Keep deep link scheme unchanged (now "dishcraft")
+
+### Fix 2: RevenueCat Pricing Update
+Remove old packages ($rc_monthly, $rc_annual, $rc_custom_*) and create:
+
+**Subscriptions:**
+- [x] unlimited_photos: $9.99/month (unlimited step photos, fair use 200/month)
+- [x] unlimited_videos: $29.99/month (unlimited videos, fair use 50/month)
+
+**One-Time Purchases (consumable):**
+- [x] step_photos_single: $1.99 (step photos for 1 recipe)
+- [x] video_single: $4.99 (video for 1 recipe)
+- [x] photo_pack_5: $7.49 (step photos for 5 recipes, save 25%)
+- [x] video_pack_5: $17.49 (videos for 5 recipes, save 30%)
+
+**Entitlements:**
+- [x] photos_access (for photo subscription)
+- [x] videos_access (for video subscription)
+
+### Fix 3: Update Code
+- [x] Update lib/revenuecat.tsx with new products
+- [x] Update app/paywall.tsx with new pricing options
+- [ ] Update tests if needed

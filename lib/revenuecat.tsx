@@ -3,12 +3,15 @@
  * 
  * Handles subscription management and in-app purchases.
  * 
- * Products:
- * - Pro Monthly: $9.99/month - Unlimited photos + 50 videos/month
- * - Pro Annual: $79.99/year - Same as monthly, 33% savings
- * - Photo Bundle: $2.99 - 10 photo credits
- * - Video Bundle Small: $4.99 - 3 video credits
- * - Video Bundle Large: $12.99 - 10 video credits
+ * SUBSCRIPTIONS:
+ * - unlimited_photos: $9.99/month (unlimited step photos, fair use 200/month)
+ * - unlimited_videos: $29.99/month (unlimited videos, fair use 50/month)
+ * 
+ * ONE-TIME PURCHASES (consumable):
+ * - step_photos_single: $1.99 (step photos for 1 recipe)
+ * - video_single: $4.99 (video for 1 recipe)
+ * - photo_pack_5: $7.49 (step photos for 5 recipes, save 25%)
+ * - video_pack_5: $17.49 (videos for 5 recipes, save 30%)
  */
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
@@ -25,28 +28,38 @@ const REVENUECAT_API_KEY = "appl_LoboVIxXHxHWrhkLQaTqgaRBlDe";
 
 // Entitlement identifiers
 export const ENTITLEMENTS = {
-  PRO_UNLIMITED: "pro_unlimited",
-  PHOTO_BUNDLE: "photo_bundle",
-  VIDEO_BUNDLE: "video_bundle",
+  PHOTOS_ACCESS: "photos_access",    // For photo subscription
+  VIDEOS_ACCESS: "videos_access",    // For video subscription
 } as const;
 
-// Package identifiers
+// Package identifiers (matching RevenueCat dashboard)
 export const PACKAGES = {
-  MONTHLY: "$rc_monthly",
-  ANNUAL: "$rc_annual",
-  PHOTO_BUNDLE: "$rc_custom_photo_bundle",
-  VIDEO_BUNDLE_SMALL: "$rc_custom_video_bundle_small",
-  VIDEO_BUNDLE_LARGE: "$rc_custom_video_bundle_large",
+  // Subscriptions
+  UNLIMITED_PHOTOS: "$rc_monthly",                    // $9.99/month
+  UNLIMITED_VIDEOS: "$rc_custom_unlimited_videos",    // $29.99/month
+  // One-time purchases
+  STEP_PHOTOS_SINGLE: "$rc_custom_step_photos_single", // $1.99
+  VIDEO_SINGLE: "$rc_custom_video_single",             // $4.99
+  PHOTO_PACK_5: "$rc_custom_photo_pack_5",             // $7.49
+  VIDEO_PACK_5: "$rc_custom_video_pack_5",             // $17.49
+} as const;
+
+// Fair use limits
+export const FAIR_USE_LIMITS = {
+  PHOTOS_PER_MONTH: 200,
+  VIDEOS_PER_MONTH: 50,
 } as const;
 
 interface RevenueCatContextType {
   isInitialized: boolean;
-  isProUser: boolean;
+  hasPhotosSubscription: boolean;
+  hasVideosSubscription: boolean;
   customerInfo: CustomerInfo | null;
   offerings: PurchasesOffering | null;
   purchasePackage: (pkg: PurchasesPackage) => Promise<{ success: boolean; error?: string; customerInfo?: CustomerInfo }>;
   restorePurchases: () => Promise<{ success: boolean; error?: string; customerInfo?: CustomerInfo }>;
-  checkProStatus: () => boolean;
+  checkPhotosAccess: () => boolean;
+  checkVideosAccess: () => boolean;
   getPackageByIdentifier: (identifier: string) => PurchasesPackage | undefined;
   refreshCustomerInfo: () => Promise<void>;
 }
@@ -117,22 +130,25 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
 
     initRevenueCat();
 
-    // Listen for customer info updates
-    // Note: On web, Purchases is not available, so we skip this
-    // The listener API varies by version, so we handle cleanup carefully
-
     return () => {
       // Cleanup handled by RevenueCat SDK internally
     };
   }, []);
 
-  // Check if user has pro subscription
-  const checkProStatus = useCallback((): boolean => {
+  // Check if user has photos subscription
+  const checkPhotosAccess = useCallback((): boolean => {
     if (!customerInfo) return false;
-    return customerInfo.entitlements.active[ENTITLEMENTS.PRO_UNLIMITED] !== undefined;
+    return customerInfo.entitlements.active[ENTITLEMENTS.PHOTOS_ACCESS] !== undefined;
   }, [customerInfo]);
 
-  const isProUser = checkProStatus();
+  // Check if user has videos subscription
+  const checkVideosAccess = useCallback((): boolean => {
+    if (!customerInfo) return false;
+    return customerInfo.entitlements.active[ENTITLEMENTS.VIDEOS_ACCESS] !== undefined;
+  }, [customerInfo]);
+
+  const hasPhotosSubscription = checkPhotosAccess();
+  const hasVideosSubscription = checkVideosAccess();
 
   // Purchase a package
   const purchasePackage = useCallback(async (pkg: PurchasesPackage): Promise<{ success: boolean; error?: string; customerInfo?: CustomerInfo }> => {
@@ -225,12 +241,14 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
 
   const value: RevenueCatContextType = {
     isInitialized,
-    isProUser,
+    hasPhotosSubscription,
+    hasVideosSubscription,
     customerInfo,
     offerings,
     purchasePackage,
     restorePurchases,
-    checkProStatus,
+    checkPhotosAccess,
+    checkVideosAccess,
     getPackageByIdentifier,
     refreshCustomerInfo,
   };
@@ -250,26 +268,24 @@ export function useCanAccessFeature(feature: "photos" | "videos"): {
   reason?: string;
   requiresUpgrade: boolean;
 } {
-  const { isProUser, customerInfo } = useRevenueCat();
+  const { hasPhotosSubscription, hasVideosSubscription, customerInfo } = useRevenueCat();
 
-  // Pro users can access everything
-  if (isProUser) {
+  // Check subscription access
+  if (feature === "photos" && hasPhotosSubscription) {
+    return { canAccess: true, requiresUpgrade: false };
+  }
+  if (feature === "videos" && hasVideosSubscription) {
     return { canAccess: true, requiresUpgrade: false };
   }
 
-  // Check for bundle entitlements
-  if (customerInfo) {
-    if (feature === "photos" && customerInfo.entitlements.active[ENTITLEMENTS.PHOTO_BUNDLE]) {
-      return { canAccess: true, requiresUpgrade: false };
-    }
-    if (feature === "videos" && customerInfo.entitlements.active[ENTITLEMENTS.VIDEO_BUNDLE]) {
-      return { canAccess: true, requiresUpgrade: false };
-    }
-  }
+  // Note: One-time purchases (consumables) are tracked via credits in our database,
+  // not via RevenueCat entitlements. The app should check userCreditsDb for remaining credits.
 
   return {
     canAccess: false,
-    reason: `Upgrade to Pro or purchase a ${feature} bundle to access this feature.`,
+    reason: feature === "photos" 
+      ? "Subscribe to Unlimited Photos ($9.99/mo) or purchase a photo pack."
+      : "Subscribe to Unlimited Videos ($29.99/mo) or purchase a video pack.",
     requiresUpgrade: true,
   };
 }

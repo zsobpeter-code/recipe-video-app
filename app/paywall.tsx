@@ -24,70 +24,71 @@ interface PricingOption {
   title: string;
   subtitle: string;
   price: string;
-  pricePerVideo?: string;
+  priceDetail?: string;
   isBestValue?: boolean;
   credits?: number;
+  isSubscription?: boolean;
 }
 
 // Video pricing options mapped to RevenueCat packages
 const VIDEO_PRICING_OPTIONS: PricingOption[] = [
   {
-    id: "video_small",
-    packageId: PACKAGES.VIDEO_BUNDLE_SMALL,
-    title: "3 Video Pack",
-    subtitle: "Pay as you go",
+    id: "video_single",
+    packageId: PACKAGES.VIDEO_SINGLE,
+    title: "Single Video",
+    subtitle: "1 recipe video",
     price: "$4.99",
-    pricePerVideo: "$1.67/video",
-    credits: 3,
+    credits: 1,
   },
   {
-    id: "video_large",
-    packageId: PACKAGES.VIDEO_BUNDLE_LARGE,
-    title: "10 Video Pack",
-    subtitle: "Save 20%",
-    price: "$12.99",
-    pricePerVideo: "$1.30/video",
-    credits: 10,
+    id: "video_pack_5",
+    packageId: PACKAGES.VIDEO_PACK_5,
+    title: "Video Pack",
+    subtitle: "5 recipe videos",
+    price: "$17.49",
+    priceDetail: "Save 30%",
+    credits: 5,
   },
   {
-    id: "pro_monthly",
-    packageId: PACKAGES.MONTHLY,
-    title: "Pro Monthly",
-    subtitle: "50 videos/month",
-    price: "$9.99/mo",
+    id: "unlimited_videos",
+    packageId: PACKAGES.UNLIMITED_VIDEOS,
+    title: "Unlimited Videos",
+    subtitle: "Fair use: 50/month",
+    price: "$29.99/mo",
     isBestValue: true,
     credits: -1, // unlimited (fair use)
+    isSubscription: true,
   },
 ];
 
 // Step photos pricing options mapped to RevenueCat packages
 const STEP_PHOTOS_PRICING_OPTIONS: PricingOption[] = [
   {
-    id: "photo_bundle",
-    packageId: PACKAGES.PHOTO_BUNDLE,
-    title: "10 Recipe Pack",
-    subtitle: "Pay as you go",
-    price: "$2.99",
-    pricePerVideo: "$0.30/recipe",
-    credits: 10,
+    id: "step_photos_single",
+    packageId: PACKAGES.STEP_PHOTOS_SINGLE,
+    title: "Single Recipe",
+    subtitle: "Step photos for 1 recipe",
+    price: "$1.99",
+    credits: 1,
   },
   {
-    id: "pro_monthly",
-    packageId: PACKAGES.MONTHLY,
-    title: "Pro Monthly",
-    subtitle: "Unlimited photos",
+    id: "photo_pack_5",
+    packageId: PACKAGES.PHOTO_PACK_5,
+    title: "Photo Pack",
+    subtitle: "Step photos for 5 recipes",
+    price: "$7.49",
+    priceDetail: "Save 25%",
+    credits: 5,
+  },
+  {
+    id: "unlimited_photos",
+    packageId: PACKAGES.UNLIMITED_PHOTOS,
+    title: "Unlimited Photos",
+    subtitle: "Fair use: 200/month",
     price: "$9.99/mo",
     isBestValue: true,
-    credits: -1, // unlimited
-  },
-  {
-    id: "pro_annual",
-    packageId: PACKAGES.ANNUAL,
-    title: "Pro Annual",
-    subtitle: "Save 33%",
-    price: "$79.99/yr",
-    pricePerVideo: "$6.67/mo",
-    credits: -1, // unlimited
+    credits: -1, // unlimited (fair use)
+    isSubscription: true,
   },
 ];
 
@@ -129,7 +130,9 @@ export default function PaywallScreen() {
   const isStepPhotos = params.productType === "step_photos";
   const pricingOptions = isStepPhotos ? STEP_PHOTOS_PRICING_OPTIONS : VIDEO_PRICING_OPTIONS;
   
-  const [selectedOption, setSelectedOption] = useState<string>(pricingOptions[0].id);
+  // Default to best value option
+  const defaultOption = pricingOptions.find(o => o.isBestValue)?.id || pricingOptions[0].id;
+  const [selectedOption, setSelectedOption] = useState<string>(defaultOption);
   const [isProcessing, setIsProcessing] = useState(false);
   const [displayPrices, setDisplayPrices] = useState<Record<string, string>>({});
 
@@ -333,11 +336,11 @@ export default function PaywallScreen() {
                 option.isBestValue && styles.pricingOptionBestValue,
               ]}
               onPress={() => handleSelectOption(option.id)}
-              activeOpacity={0.8}
+              activeOpacity={0.7}
             >
               {option.isBestValue && (
                 <View style={styles.bestValueBadge}>
-                  <Text style={[styles.bestValueText, { fontFamily: "Inter-Medium" }]}>
+                  <Text style={[styles.bestValueText, { fontFamily: "Inter-SemiBold" }]}>
                     BEST VALUE
                   </Text>
                 </View>
@@ -354,7 +357,7 @@ export default function PaywallScreen() {
                     )}
                   </View>
                   <View style={styles.pricingTextContainer}>
-                    <Text style={[styles.pricingTitle, { fontFamily: "Inter-Medium" }]}>
+                    <Text style={[styles.pricingTitle, { fontFamily: "Inter-SemiBold" }]}>
                       {option.title}
                     </Text>
                     <Text style={[styles.pricingSubtitle, { fontFamily: "Inter" }]}>
@@ -362,13 +365,14 @@ export default function PaywallScreen() {
                     </Text>
                   </View>
                 </View>
+                
                 <View style={styles.pricingRight}>
-                  <Text style={[styles.pricingPrice, { fontFamily: "Inter-Medium" }]}>
+                  <Text style={[styles.pricingPrice, { fontFamily: "Inter-Bold" }]}>
                     {getDisplayPrice(option)}
                   </Text>
-                  {option.pricePerVideo && (
-                    <Text style={[styles.pricingPerVideo, { fontFamily: "Inter" }]}>
-                      {option.pricePerVideo}
+                  {option.priceDetail && (
+                    <Text style={[styles.pricingDetail, { fontFamily: "Inter" }]}>
+                      {option.priceDetail}
                     </Text>
                   )}
                 </View>
@@ -388,9 +392,9 @@ export default function PaywallScreen() {
           activeOpacity={0.8}
         >
           {isProcessing ? (
-            <ActivityIndicator color="#1A1A1A" size="small" />
+            <ActivityIndicator color="#1A1A1A" />
           ) : (
-            <Text style={[styles.continueButtonText, { fontFamily: "Inter-Medium" }]}>
+            <Text style={[styles.continueButtonText, { fontFamily: "Inter-SemiBold" }]}>
               Continue
             </Text>
           )}
@@ -410,8 +414,12 @@ export default function PaywallScreen() {
 
         {/* Terms */}
         <Text style={[styles.termsText, { fontFamily: "Inter" }]}>
+          {pricingOptions.find(o => o.id === selectedOption)?.isSubscription
+            ? "Subscription auto-renews monthly. Cancel anytime in Settings."
+            : "One-time purchase. Credits never expire."}
+        </Text>
+        <Text style={[styles.termsText, { fontFamily: "Inter" }]}>
           By continuing, you agree to our Terms of Service and Privacy Policy.
-          {"\n"}Subscriptions auto-renew unless cancelled 24 hours before the end of the current period.
         </Text>
       </ScrollView>
     </ScreenContainer>
@@ -421,24 +429,18 @@ export default function PaywallScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#1A1A1A",
     paddingHorizontal: 24,
   },
   closeButton: {
     position: "absolute",
     top: 16,
     right: 0,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    alignItems: "center",
-    justifyContent: "center",
     zIndex: 10,
+    padding: 8,
   },
   iconContainer: {
     alignItems: "center",
-    marginTop: 60,
+    marginTop: 48,
     marginBottom: 24,
   },
   premiumIcon: {
@@ -448,8 +450,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(201, 169, 98, 0.15)",
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "rgba(201, 169, 98, 0.3)",
   },
   iconGlow: {
     position: "absolute",
@@ -466,11 +466,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 15,
-    color: "#888888",
+    fontSize: 16,
+    color: "#B3B3B3",
     textAlign: "center",
-    lineHeight: 22,
     marginBottom: 32,
+    lineHeight: 24,
+    paddingHorizontal: 16,
   },
   featuresContainer: {
     marginBottom: 32,
@@ -481,9 +482,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   featureIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: "rgba(201, 169, 98, 0.15)",
     alignItems: "center",
     justifyContent: "center",
@@ -491,14 +492,14 @@ const styles = StyleSheet.create({
   },
   featureText: {
     fontSize: 15,
-    color: "#CCCCCC",
+    color: "#FFFFFF",
     flex: 1,
   },
   pricingContainer: {
     marginBottom: 24,
   },
   pricingOption: {
-    backgroundColor: "#252525",
+    backgroundColor: "#2D2D2D",
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
@@ -507,10 +508,9 @@ const styles = StyleSheet.create({
   },
   pricingOptionSelected: {
     borderColor: "#C9A962",
-    backgroundColor: "rgba(201, 169, 98, 0.1)",
   },
   pricingOptionBestValue: {
-    borderColor: "rgba(201, 169, 98, 0.5)",
+    backgroundColor: "rgba(201, 169, 98, 0.1)",
   },
   bestValueBadge: {
     position: "absolute",
@@ -541,7 +541,7 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
     borderWidth: 2,
-    borderColor: "#555555",
+    borderColor: "#666666",
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
@@ -565,7 +565,7 @@ const styles = StyleSheet.create({
   },
   pricingSubtitle: {
     fontSize: 13,
-    color: "#888888",
+    color: "#B3B3B3",
   },
   pricingRight: {
     alignItems: "flex-end",
@@ -574,9 +574,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: "#FFFFFF",
   },
-  pricingPerVideo: {
+  pricingDetail: {
     fontSize: 12,
-    color: "#888888",
+    color: "#4ADE80",
     marginTop: 2,
   },
   continueButton: {
@@ -600,14 +600,13 @@ const styles = StyleSheet.create({
   },
   restoreButtonText: {
     fontSize: 14,
-    color: "#888888",
-    textDecorationLine: "underline",
+    color: "#C9A962",
   },
   termsText: {
-    fontSize: 11,
+    fontSize: 12,
     color: "#666666",
     textAlign: "center",
-    lineHeight: 16,
-    marginBottom: 20,
+    marginBottom: 8,
+    lineHeight: 18,
   },
 });
