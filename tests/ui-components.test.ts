@@ -55,7 +55,7 @@ describe("UI Components", () => {
       // Read the app.config.ts file content
       const fs = await import("fs");
       const configContent = fs.readFileSync("./app.config.ts", "utf-8");
-      expect(configContent).toContain('appName: "Recipe Studio"');
+      expect(configContent).toContain('appName: "Dishcraft');
     });
 
     it("should have logo URL configured", async () => {

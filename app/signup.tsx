@@ -115,7 +115,7 @@ export default function SignUpScreen() {
               style={{ fontFamily: "PlayfairDisplay-Bold" }} 
               className="text-2xl text-foreground"
             >
-              Recipe Studio
+              Dishcraft
             </Text>
           </View>
 

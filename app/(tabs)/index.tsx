@@ -213,7 +213,7 @@ export default function HomeScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={[styles.title, { fontFamily: "PlayfairDisplay-Bold" }]}>
-          Recipe Studio
+          Dishcraft
         </Text>
         <Text style={[styles.subtitle, { fontFamily: "Caveat" }]}>
           Your culinary collection

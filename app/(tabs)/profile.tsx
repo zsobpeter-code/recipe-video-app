@@ -251,7 +251,7 @@ export default function ProfileScreen() {
 
         {/* App Version */}
         <Text style={[styles.versionText, { fontFamily: "Inter" }]}>
-          Recipe Studio v1.0.0
+          Dishcraft v1.0.0
         </Text>
       </ScrollView>
     </ScreenContainer>

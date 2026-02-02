@@ -1,5 +1,5 @@
 /**
- * RevenueCat Integration for Recipe Studio
+ * RevenueCat Integration for Dishcraft
  * 
  * Handles subscription management and in-app purchases.
  * 

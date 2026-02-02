@@ -839,3 +839,14 @@ After generating individual step videos, concatenate them into a single video fi
 - [x] Wire Restore Purchases button to restorePurchases()
 - [ ] Add server-side receipt validation (deferred - not blocking MVP)
 
+
+## App Renaming - Recipe Studio → Dishcraft – AI Visual Cooking
+
+- [x] Update app.config.ts appName to "Dishcraft – AI Visual Cooking"
+- [x] Update navigation headers/titles (login, signup, home screen)
+- [x] Update onboarding screens text
+- [x] Update share messages (recipeShareService.ts)
+- [x] Update any splash/loading text
+- [x] Keep bundle ID unchanged
+- [x] Keep Supabase project name unchanged
+- [x] Keep file/folder names unchanged

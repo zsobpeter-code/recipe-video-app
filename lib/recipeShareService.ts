@@ -170,7 +170,7 @@ function generateRecipeHTML(recipe: RecipeData): string {
       }
       
       <div class="footer">
-        Created with <span>✨ Recipe Studio</span>
+        Created with <span>✨ Dishcraft</span>
       </div>
     </body>
     </html>
@@ -248,7 +248,7 @@ ${stepsText}
 
 ⏱ ${totalTime > 0 ? `${totalTime} min` : ""} | 👥 ${recipe.servings || 4} servings
 
-Made with Recipe Studio ✨
+Made with Dishcraft ✨
     `.trim();
     
     // On iOS, we can share both image and text

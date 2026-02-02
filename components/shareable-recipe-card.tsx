@@ -145,7 +145,7 @@ export const ShareableRecipeCard = forwardRef<ViewShot, ShareableRecipeCardProps
             <View style={styles.branding}>
               <IconSymbol name="sparkles" size={12} color="#C9A962" />
               <Text style={[styles.brandText, { fontFamily: "Inter-Medium" }]}>
-                Recipe Studio
+                Dishcraft
               </Text>
             </View>
           </View>
