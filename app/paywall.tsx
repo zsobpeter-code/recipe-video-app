@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useRevenueCat, PACKAGES } from "@/lib/revenuecat";
+import { useRevenueCat, PACKAGES, PRICING } from "@/lib/revenuecat";
 import type { PurchasesPackage } from "react-native-purchases";
 
 interface PricingOption {
@@ -26,84 +26,64 @@ interface PricingOption {
   price: string;
   priceDetail?: string;
   isBestValue?: boolean;
-  credits?: number;
   isSubscription?: boolean;
+  forPhotos?: boolean;
+  forVideos?: boolean;
 }
 
-// Video pricing options mapped to RevenueCat packages
-const VIDEO_PRICING_OPTIONS: PricingOption[] = [
+// All pricing options - 3 products only
+const ALL_PRICING_OPTIONS: PricingOption[] = [
+  {
+    id: "photo_single",
+    packageId: PACKAGES.PHOTO_SINGLE,
+    title: "Photo Single",
+    subtitle: "AI step photos for 1 recipe",
+    price: PRICING.PHOTO_SINGLE,
+    forPhotos: true,
+    forVideos: false,
+  },
   {
     id: "video_single",
     packageId: PACKAGES.VIDEO_SINGLE,
-    title: "Single Video",
-    subtitle: "1 recipe video",
-    price: "$4.99",
-    credits: 1,
+    title: "Video Single",
+    subtitle: "AI tutorial video for 1 recipe",
+    price: PRICING.VIDEO_SINGLE,
+    forPhotos: false,
+    forVideos: true,
   },
   {
-    id: "video_pack_5",
-    packageId: PACKAGES.VIDEO_PACK_5,
-    title: "Video Pack",
-    subtitle: "5 recipe videos",
-    price: "$17.49",
-    priceDetail: "Save 30%",
-    credits: 5,
-  },
-  {
-    id: "unlimited_videos",
-    packageId: PACKAGES.UNLIMITED_VIDEOS,
-    title: "Unlimited Videos",
-    subtitle: "Fair use: 50/month",
-    price: "$29.99/mo",
+    id: "studio_monthly",
+    packageId: PACKAGES.STUDIO_MONTHLY,
+    title: "Dishcraft Studio",
+    subtitle: "Unlimited photos + 10 videos/month",
+    price: PRICING.STUDIO_MONTHLY,
     isBestValue: true,
-    credits: -1, // unlimited (fair use)
     isSubscription: true,
+    forPhotos: true,
+    forVideos: true,
   },
 ];
 
-// Step photos pricing options mapped to RevenueCat packages
-const STEP_PHOTOS_PRICING_OPTIONS: PricingOption[] = [
-  {
-    id: "step_photos_single",
-    packageId: PACKAGES.STEP_PHOTOS_SINGLE,
-    title: "Single Recipe",
-    subtitle: "Step photos for 1 recipe",
-    price: "$1.99",
-    credits: 1,
-  },
-  {
-    id: "photo_pack_5",
-    packageId: PACKAGES.PHOTO_PACK_5,
-    title: "Photo Pack",
-    subtitle: "Step photos for 5 recipes",
-    price: "$7.49",
-    priceDetail: "Save 25%",
-    credits: 5,
-  },
-  {
-    id: "unlimited_photos",
-    packageId: PACKAGES.UNLIMITED_PHOTOS,
-    title: "Unlimited Photos",
-    subtitle: "Fair use: 200/month",
-    price: "$9.99/mo",
-    isBestValue: true,
-    credits: -1, // unlimited (fair use)
-    isSubscription: true,
-  },
+const STUDIO_FEATURES = [
+  { icon: "photo.fill", text: "Unlimited AI step photos" },
+  { icon: "video.fill", text: "10 AI tutorial videos per month" },
+  { icon: "wand.and.stars", text: "Flux AI + Runway Gen-3 technology" },
+  { icon: "square.and.arrow.up", text: "Share to TikTok & Instagram" },
+  { icon: "arrow.down.circle", text: "Save to camera roll" },
 ];
 
-const VIDEO_FEATURES = [
-  { icon: "video.fill", text: "AI-generated cooking tutorial videos" },
-  { icon: "wand.and.stars", text: "Runway Gen-3 video technology" },
-  { icon: "square.and.arrow.up", text: "Share directly to TikTok & Instagram" },
-  { icon: "arrow.down.circle", text: "Save videos to camera roll" },
-];
-
-const STEP_PHOTOS_FEATURES = [
+const PHOTO_FEATURES = [
   { icon: "photo.fill", text: "AI-generated photos for each step" },
   { icon: "wand.and.stars", text: "Flux AI image technology" },
   { icon: "eye", text: "See what each step should look like" },
   { icon: "bookmark.fill", text: "Photos saved with your recipe" },
+];
+
+const VIDEO_FEATURES = [
+  { icon: "video.fill", text: "AI-generated cooking tutorial video" },
+  { icon: "wand.and.stars", text: "Runway Gen-3 video technology" },
+  { icon: "square.and.arrow.up", text: "Share directly to TikTok & Instagram" },
+  { icon: "arrow.down.circle", text: "Save videos to camera roll" },
 ];
 
 export default function PaywallScreen() {
@@ -128,13 +108,26 @@ export default function PaywallScreen() {
   } = useRevenueCat();
 
   const isStepPhotos = params.productType === "step_photos";
-  const pricingOptions = isStepPhotos ? STEP_PHOTOS_PRICING_OPTIONS : VIDEO_PRICING_OPTIONS;
   
-  // Default to best value option
+  // Filter options based on product type
+  const pricingOptions = ALL_PRICING_OPTIONS.filter(o => {
+    if (isStepPhotos) return o.forPhotos;
+    return o.forVideos;
+  });
+  
+  // Default to Studio (best value) option
   const defaultOption = pricingOptions.find(o => o.isBestValue)?.id || pricingOptions[0].id;
   const [selectedOption, setSelectedOption] = useState<string>(defaultOption);
   const [isProcessing, setIsProcessing] = useState(false);
   const [displayPrices, setDisplayPrices] = useState<Record<string, string>>({});
+
+  // Get features based on selected option
+  const getFeatures = () => {
+    const selected = pricingOptions.find(o => o.id === selectedOption);
+    if (selected?.id === "studio_monthly") return STUDIO_FEATURES;
+    if (isStepPhotos) return PHOTO_FEATURES;
+    return VIDEO_FEATURES;
+  };
 
   // Update prices from RevenueCat offerings
   useEffect(() => {
@@ -313,7 +306,7 @@ export default function PaywallScreen() {
 
         {/* Features */}
         <View style={styles.featuresContainer}>
-          {(isStepPhotos ? STEP_PHOTOS_FEATURES : VIDEO_FEATURES).map((feature, index) => (
+          {getFeatures().map((feature, index) => (
             <View key={index} style={styles.featureRow}>
               <View style={styles.featureIconContainer}>
                 <IconSymbol name={feature.icon as any} size={18} color="#C9A962" />
@@ -336,11 +329,11 @@ export default function PaywallScreen() {
                 option.isBestValue && styles.pricingOptionBestValue,
               ]}
               onPress={() => handleSelectOption(option.id)}
-              activeOpacity={0.7}
+              activeOpacity={0.8}
             >
               {option.isBestValue && (
                 <View style={styles.bestValueBadge}>
-                  <Text style={[styles.bestValueText, { fontFamily: "Inter-SemiBold" }]}>
+                  <Text style={[styles.bestValueText, { fontFamily: "Inter-Medium" }]}>
                     BEST VALUE
                   </Text>
                 </View>
@@ -356,8 +349,8 @@ export default function PaywallScreen() {
                       <View style={styles.radioInner} />
                     )}
                   </View>
-                  <View style={styles.pricingTextContainer}>
-                    <Text style={[styles.pricingTitle, { fontFamily: "Inter-SemiBold" }]}>
+                  <View style={styles.pricingInfo}>
+                    <Text style={[styles.pricingTitle, { fontFamily: "Inter-Medium" }]}>
                       {option.title}
                     </Text>
                     <Text style={[styles.pricingSubtitle, { fontFamily: "Inter" }]}>
@@ -367,7 +360,7 @@ export default function PaywallScreen() {
                 </View>
                 
                 <View style={styles.pricingRight}>
-                  <Text style={[styles.pricingPrice, { fontFamily: "Inter-Bold" }]}>
+                  <Text style={[styles.pricingPrice, { fontFamily: "Inter-Medium" }]}>
                     {getDisplayPrice(option)}
                   </Text>
                   {option.priceDetail && (
@@ -383,10 +376,7 @@ export default function PaywallScreen() {
 
         {/* Continue Button */}
         <TouchableOpacity
-          style={[
-            styles.continueButton,
-            isProcessing && styles.continueButtonDisabled,
-          ]}
+          style={[styles.continueButton, isProcessing && styles.continueButtonDisabled]}
           onPress={handleContinue}
           disabled={isProcessing}
           activeOpacity={0.8}
@@ -394,7 +384,7 @@ export default function PaywallScreen() {
           {isProcessing ? (
             <ActivityIndicator color="#1A1A1A" />
           ) : (
-            <Text style={[styles.continueButtonText, { fontFamily: "Inter-SemiBold" }]}>
+            <Text style={[styles.continueButtonText, { fontFamily: "Inter-Medium" }]}>
               Continue
             </Text>
           )}
@@ -416,10 +406,7 @@ export default function PaywallScreen() {
         <Text style={[styles.termsText, { fontFamily: "Inter" }]}>
           {pricingOptions.find(o => o.id === selectedOption)?.isSubscription
             ? "Subscription auto-renews monthly. Cancel anytime in Settings."
-            : "One-time purchase. Credits never expire."}
-        </Text>
-        <Text style={[styles.termsText, { fontFamily: "Inter" }]}>
-          By continuing, you agree to our Terms of Service and Privacy Policy.
+            : "One-time purchase. No subscription required."}
         </Text>
       </ScrollView>
     </ScreenContainer>
@@ -429,27 +416,32 @@ export default function PaywallScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 24,
   },
   closeButton: {
     position: "absolute",
-    top: 16,
-    right: 0,
+    top: 8,
+    right: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    justifyContent: "center",
+    alignItems: "center",
     zIndex: 10,
-    padding: 8,
   },
   iconContainer: {
     alignItems: "center",
-    marginTop: 48,
+    marginTop: 60,
     marginBottom: 24,
   },
   premiumIcon: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: "rgba(201, 169, 98, 0.15)",
-    alignItems: "center",
     justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1,
   },
   iconGlow: {
     position: "absolute",
@@ -457,69 +449,73 @@ const styles = StyleSheet.create({
     height: 120,
     borderRadius: 60,
     backgroundColor: "rgba(201, 169, 98, 0.1)",
-    zIndex: -1,
   },
   title: {
     fontSize: 28,
     color: "#FFFFFF",
     textAlign: "center",
     marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: "#B3B3B3",
-    textAlign: "center",
-    marginBottom: 32,
-    lineHeight: 24,
     paddingHorizontal: 16,
   },
+  subtitle: {
+    fontSize: 15,
+    color: "#888888",
+    textAlign: "center",
+    paddingHorizontal: 32,
+    lineHeight: 22,
+    marginBottom: 24,
+  },
   featuresContainer: {
-    marginBottom: 32,
+    paddingHorizontal: 24,
+    marginBottom: 24,
   },
   featureRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 12,
   },
   featureIconContainer: {
     width: 32,
     height: 32,
-    borderRadius: 16,
+    borderRadius: 8,
     backgroundColor: "rgba(201, 169, 98, 0.15)",
-    alignItems: "center",
     justifyContent: "center",
+    alignItems: "center",
     marginRight: 12,
   },
   featureText: {
-    fontSize: 15,
-    color: "#FFFFFF",
+    fontSize: 14,
+    color: "#CCCCCC",
     flex: 1,
   },
   pricingContainer: {
+    paddingHorizontal: 16,
     marginBottom: 24,
+    gap: 12,
   },
   pricingOption: {
-    backgroundColor: "#2D2D2D",
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
     borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
     borderWidth: 2,
-    borderColor: "transparent",
+    borderColor: "rgba(255, 255, 255, 0.1)",
+    padding: 16,
+    position: "relative",
   },
   pricingOptionSelected: {
     borderColor: "#C9A962",
+    backgroundColor: "rgba(201, 169, 98, 0.1)",
   },
   pricingOptionBestValue: {
-    backgroundColor: "rgba(201, 169, 98, 0.1)",
+    borderColor: "#C9A962",
   },
   bestValueBadge: {
     position: "absolute",
     top: -10,
     right: 16,
     backgroundColor: "#C9A962",
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 8,
   },
   bestValueText: {
     fontSize: 10,
@@ -541,9 +537,9 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
     borderWidth: 2,
-    borderColor: "#666666",
-    alignItems: "center",
+    borderColor: "#555555",
     justifyContent: "center",
+    alignItems: "center",
     marginRight: 12,
   },
   radioOuterSelected: {
@@ -555,7 +551,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: "#C9A962",
   },
-  pricingTextContainer: {
+  pricingInfo: {
     flex: 1,
   },
   pricingTitle: {
@@ -565,26 +561,27 @@ const styles = StyleSheet.create({
   },
   pricingSubtitle: {
     fontSize: 13,
-    color: "#B3B3B3",
+    color: "#888888",
   },
   pricingRight: {
     alignItems: "flex-end",
   },
   pricingPrice: {
     fontSize: 18,
-    color: "#FFFFFF",
+    color: "#C9A962",
   },
   pricingDetail: {
-    fontSize: 12,
-    color: "#4ADE80",
+    fontSize: 11,
+    color: "#22C55E",
     marginTop: 2,
   },
   continueButton: {
+    marginHorizontal: 16,
     backgroundColor: "#C9A962",
-    borderRadius: 16,
-    paddingVertical: 18,
+    borderRadius: 28,
+    paddingVertical: 16,
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 12,
   },
   continueButtonDisabled: {
     opacity: 0.7,
@@ -596,17 +593,18 @@ const styles = StyleSheet.create({
   restoreButton: {
     alignItems: "center",
     paddingVertical: 12,
-    marginBottom: 16,
+    marginBottom: 8,
   },
   restoreButtonText: {
     fontSize: 14,
-    color: "#C9A962",
+    color: "#888888",
+    textDecorationLine: "underline",
   },
   termsText: {
-    fontSize: 12,
-    color: "#666666",
+    fontSize: 11,
+    color: "#555555",
     textAlign: "center",
-    marginBottom: 8,
-    lineHeight: 18,
+    paddingHorizontal: 32,
+    lineHeight: 16,
   },
 });

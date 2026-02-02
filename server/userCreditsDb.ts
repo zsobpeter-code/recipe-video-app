@@ -1,10 +1,12 @@
 /**
  * User Credits Database Service
  * 
- * Handles credit tracking for bundle purchases and fair use limits.
- * - Photo credits: For photo bundle purchases
- * - Video credits: For video bundle purchases
- * - Videos generated this month: For 50/month fair use cap on unlimited subscriptions
+ * Handles credit tracking for purchases and Studio subscription limits.
+ * 
+ * Products:
+ * - Photo Single ($1.99): 1 recipe photo credit
+ * - Video Single ($6.99): 1 recipe video credit
+ * - Studio Monthly ($49.99/mo): Unlimited photos + 10 videos/month
  */
 
 import { createClient } from "@supabase/supabase-js";
@@ -31,8 +33,8 @@ export interface UserCredits {
   updated_at: string;
 }
 
-// Fair use limit for unlimited subscription
-const MONTHLY_VIDEO_LIMIT = 50;
+// Studio subscription monthly video limit
+const STUDIO_MONTHLY_VIDEO_LIMIT = 10;
 
 /**
  * Get or create user credits record
@@ -108,10 +110,11 @@ export async function getUserCredits(userId: string): Promise<UserCredits | null
 }
 
 /**
- * Check if user can generate video (fair use limit)
- * Returns true if under limit, false if limit reached
+ * Check if user can generate video
+ * - Studio subscribers: 10 videos/month limit
+ * - One-time purchase: Uses video credits
  */
-export async function canGenerateVideo(userId: string, isUnlimitedSubscription: boolean): Promise<{ allowed: boolean; remaining: number; message?: string }> {
+export async function canGenerateVideo(userId: string, hasStudioSubscription: boolean): Promise<{ allowed: boolean; remaining: number; message?: string }> {
   try {
     const credits = await getUserCredits(userId);
     
@@ -119,27 +122,27 @@ export async function canGenerateVideo(userId: string, isUnlimitedSubscription: 
       return { allowed: false, remaining: 0, message: "Could not verify credits" };
     }
 
-    // For unlimited subscription, check fair use cap
-    if (isUnlimitedSubscription) {
-      const remaining = MONTHLY_VIDEO_LIMIT - credits.videos_generated_this_month;
+    // For Studio subscription, check monthly cap (10 videos/month)
+    if (hasStudioSubscription) {
+      const remaining = STUDIO_MONTHLY_VIDEO_LIMIT - credits.videos_generated_this_month;
       
-      if (credits.videos_generated_this_month >= MONTHLY_VIDEO_LIMIT) {
+      if (credits.videos_generated_this_month >= STUDIO_MONTHLY_VIDEO_LIMIT) {
         return {
           allowed: false,
           remaining: 0,
-          message: `You've reached your monthly limit of ${MONTHLY_VIDEO_LIMIT} videos. Your limit resets on the 1st of next month.`,
+          message: `You've reached your monthly limit of ${STUDIO_MONTHLY_VIDEO_LIMIT} videos. Your limit resets on the 1st of next month.`,
         };
       }
       
       return { allowed: true, remaining };
     }
 
-    // For bundle purchases, check video credits
+    // For one-time purchases, check video credits
     if (credits.video_credits <= 0) {
       return {
         allowed: false,
         remaining: 0,
-        message: "You don't have any video credits. Purchase a video bundle to continue.",
+        message: "You don't have any video credits. Purchase Video Single ($6.99) or subscribe to Dishcraft Studio ($49.99/mo).",
       };
     }
 
@@ -152,12 +155,14 @@ export async function canGenerateVideo(userId: string, isUnlimitedSubscription: 
 
 /**
  * Check if user can generate step photos
+ * - Studio subscribers: Unlimited photos
+ * - One-time purchase: Uses photo credits
  */
-export async function canGeneratePhotos(userId: string, isUnlimitedSubscription: boolean): Promise<{ allowed: boolean; remaining: number; message?: string }> {
+export async function canGeneratePhotos(userId: string, hasStudioSubscription: boolean): Promise<{ allowed: boolean; remaining: number; message?: string }> {
   try {
-    // Unlimited photo subscription = always allowed
-    if (isUnlimitedSubscription) {
-      return { allowed: true, remaining: 999 };
+    // Studio subscription = unlimited photos
+    if (hasStudioSubscription) {
+      return { allowed: true, remaining: -1 }; // -1 indicates unlimited
     }
 
     const credits = await getUserCredits(userId);
@@ -170,7 +175,7 @@ export async function canGeneratePhotos(userId: string, isUnlimitedSubscription:
       return {
         allowed: false,
         remaining: 0,
-        message: "You don't have any photo credits. Purchase a photo bundle to continue.",
+        message: "You don't have any photo credits. Purchase Photo Single ($1.99) or subscribe to Dishcraft Studio ($49.99/mo).",
       };
     }
 
@@ -185,13 +190,13 @@ export async function canGeneratePhotos(userId: string, isUnlimitedSubscription:
  * Decrement video credits after successful generation
  * Only call this AFTER video generation succeeds
  */
-export async function decrementVideoCredits(userId: string, isUnlimitedSubscription: boolean): Promise<boolean> {
+export async function decrementVideoCredits(userId: string, hasStudioSubscription: boolean): Promise<boolean> {
   try {
     const credits = await getUserCredits(userId);
     if (!credits) return false;
 
-    if (isUnlimitedSubscription) {
-      // Increment monthly counter for unlimited subscription
+    if (hasStudioSubscription) {
+      // Increment monthly counter for Studio subscription
       const { error } = await supabaseAdmin
         .from("user_credits")
         .update({
@@ -205,11 +210,11 @@ export async function decrementVideoCredits(userId: string, isUnlimitedSubscript
         return false;
       }
 
-      console.log(`[UserCredits] Incremented monthly video count for ${userId}: ${credits.videos_generated_this_month + 1}/${MONTHLY_VIDEO_LIMIT}`);
+      console.log(`[UserCredits] Incremented monthly video count for ${userId}: ${credits.videos_generated_this_month + 1}/${STUDIO_MONTHLY_VIDEO_LIMIT}`);
       return true;
     }
 
-    // Decrement video credits for bundle purchase
+    // Decrement video credits for one-time purchase
     const { error } = await supabaseAdmin
       .from("user_credits")
       .update({
@@ -233,7 +238,7 @@ export async function decrementVideoCredits(userId: string, isUnlimitedSubscript
 
 /**
  * Decrement photo credits after successful generation
- * Only call this AFTER photo generation succeeds
+ * Only call this AFTER photo generation succeeds (not for Studio subscribers)
  */
 export async function decrementPhotoCredits(userId: string): Promise<boolean> {
   try {
@@ -262,7 +267,7 @@ export async function decrementPhotoCredits(userId: string): Promise<boolean> {
 }
 
 /**
- * Add credits to user account (after purchase)
+ * Add credits to user account (after one-time purchase)
  */
 export async function addCredits(userId: string, photoCredits: number, videoCredits: number): Promise<boolean> {
   try {
@@ -294,20 +299,32 @@ export async function addCredits(userId: string, photoCredits: number, videoCred
 /**
  * Get remaining credits for display
  */
-export async function getRemainingCredits(userId: string): Promise<{ photoCredits: number; videoCredits: number; videosThisMonth: number; monthlyLimit: number }> {
+export async function getRemainingCredits(userId: string): Promise<{ 
+  photoCredits: number; 
+  videoCredits: number; 
+  videosThisMonth: number; 
+  studioMonthlyLimit: number;
+}> {
   try {
     const credits = await getUserCredits(userId);
     if (!credits) {
-      return { photoCredits: 0, videoCredits: 0, videosThisMonth: 0, monthlyLimit: MONTHLY_VIDEO_LIMIT };
+      return { photoCredits: 0, videoCredits: 0, videosThisMonth: 0, studioMonthlyLimit: STUDIO_MONTHLY_VIDEO_LIMIT };
     }
 
     return {
       photoCredits: credits.photo_credits,
       videoCredits: credits.video_credits,
       videosThisMonth: credits.videos_generated_this_month,
-      monthlyLimit: MONTHLY_VIDEO_LIMIT,
+      studioMonthlyLimit: STUDIO_MONTHLY_VIDEO_LIMIT,
     };
   } catch (error) {
-    return { photoCredits: 0, videoCredits: 0, videosThisMonth: 0, monthlyLimit: MONTHLY_VIDEO_LIMIT };
+    return { photoCredits: 0, videoCredits: 0, videosThisMonth: 0, studioMonthlyLimit: STUDIO_MONTHLY_VIDEO_LIMIT };
   }
+}
+
+/**
+ * Get Studio subscription monthly limit constant
+ */
+export function getStudioMonthlyVideoLimit(): number {
+  return STUDIO_MONTHLY_VIDEO_LIMIT;
 }

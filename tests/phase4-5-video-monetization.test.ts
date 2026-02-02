@@ -76,27 +76,23 @@ describe("Phase 4 & 5: Video Generation & Monetization", () => {
       const paywallPath = path.join(projectRoot, "app/paywall.tsx");
       const content = fs.readFileSync(paywallPath, "utf-8");
       
-      expect(content).toContain("STEP_PHOTOS_FEATURES");
+      expect(content).toContain("PHOTO_FEATURES");
       expect(content).toContain("VIDEO_FEATURES");
+      expect(content).toContain("STUDIO_FEATURES");
       expect(content).toContain("AI-generated photos for each step");
-      expect(content).toContain("AI-generated cooking tutorial videos");
+      expect(content).toContain("AI-generated cooking tutorial video");
     });
 
     it("should have pricing options", () => {
       const paywallPath = path.join(projectRoot, "app/paywall.tsx");
       const content = fs.readFileSync(paywallPath, "utf-8");
       
-      // Video pricing (Dishcraft pricing)
-      expect(content).toContain("VIDEO_PRICING_OPTIONS");
-      expect(content).toContain("$4.99"); // Video single
-      expect(content).toContain("$17.49"); // Video pack 5
-      expect(content).toContain("$29.99/mo"); // Unlimited videos
-      // Step photos pricing (Dishcraft pricing)
-      expect(content).toContain("STEP_PHOTOS_PRICING_OPTIONS");
-      expect(content).toContain("$1.99"); // Step photos single
-      expect(content).toContain("$7.49"); // Photo pack 5
-      expect(content).toContain("$9.99/mo"); // Unlimited photos
-      expect(content).toContain("BEST VALUE");
+      // New 3-product pricing model (Feb 2026)
+      expect(content).toContain("ALL_PRICING_OPTIONS");
+      expect(content).toContain("PRICING.PHOTO_SINGLE"); // $1.99
+      expect(content).toContain("PRICING.VIDEO_SINGLE"); // $6.99
+      expect(content).toContain("PRICING.STUDIO_MONTHLY"); // $49.99/mo
+      expect(content).toContain("isBestValue");
     });
 
     it("should have continue button and restore purchases", () => {

@@ -17,6 +17,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useAuth } from "@/hooks/use-auth";
 import { trpc } from "@/lib/trpc";
+import { useRevenueCat, PRICING } from "@/lib/revenuecat";
 
 interface SettingsItemProps {
   icon: any;
@@ -67,6 +68,9 @@ export default function ProfileScreen() {
   const { data: stats } = trpc.recipe.list.useQuery({});
   const recipesCount = stats?.recipes?.length || 0;
   const videosGenerated = 0; // Will be tracked later
+
+  // Get subscription status
+  const { hasStudioSubscription } = useRevenueCat();
 
   // Get user initials for avatar
   const userEmail = user?.email || "guest@example.com";
@@ -169,7 +173,7 @@ export default function ProfileScreen() {
 
         {/* Subscription Status */}
         <TouchableOpacity 
-          style={styles.subscriptionCard}
+          style={[styles.subscriptionCard, hasStudioSubscription && styles.subscriptionCardActive]}
           onPress={handleUpgrade}
           activeOpacity={0.8}
         >
@@ -179,18 +183,27 @@ export default function ProfileScreen() {
             </View>
             <View>
               <Text style={[styles.subscriptionTitle, { fontFamily: "Inter-Medium" }]}>
-                Free Plan
+                {hasStudioSubscription ? "Dishcraft Studio" : "Free Plan"}
               </Text>
               <Text style={[styles.subscriptionSubtitle, { fontFamily: "Inter" }]}>
-                Upgrade to unlock video generation
+                {hasStudioSubscription 
+                  ? "Unlimited photos + 10 videos/month"
+                  : `Upgrade to Studio for ${PRICING.STUDIO_MONTHLY}`}
               </Text>
             </View>
           </View>
-          <View style={styles.upgradeButton}>
-            <Text style={[styles.upgradeButtonText, { fontFamily: "Inter-Medium" }]}>
-              Upgrade
-            </Text>
-          </View>
+          {!hasStudioSubscription && (
+            <View style={styles.upgradeButton}>
+              <Text style={[styles.upgradeButtonText, { fontFamily: "Inter-Medium" }]}>
+                Upgrade
+              </Text>
+            </View>
+          )}
+          {hasStudioSubscription && (
+            <View style={styles.activeIndicator}>
+              <IconSymbol name="checkmark.circle.fill" size={20} color="#22C55E" />
+            </View>
+          )}
         </TouchableOpacity>
 
         {/* Settings Section */}
@@ -379,6 +392,18 @@ const styles = StyleSheet.create({
   upgradeButtonText: {
     fontSize: 14,
     color: "#1A1A1A",
+  },
+  subscriptionCardActive: {
+    borderColor: "rgba(34, 197, 94, 0.3)",
+    backgroundColor: "rgba(34, 197, 94, 0.1)",
+  },
+  activeIndicator: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(34, 197, 94, 0.2)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   settingsSection: {
     marginTop: 24,

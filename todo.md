@@ -890,3 +890,27 @@ Remove old packages ($rc_monthly, $rc_annual, $rc_custom_*) and create:
 - [x] Update Profile screen Privacy Policy link to https://dishcraft.ai/privacy.html
 - [x] Update Profile screen Terms of Service link to https://dishcraft.ai/terms.html
 - [ ] Save checkpoint for deployment
+
+
+## Pricing Model## Pricing Model Update - Feb 2026
+
+### New Products (3 total):
+- [x] dishcraft.photo_single — $1.99 (Consumable) — AI step photos for one recipe
+- [x] dishcraft.video_single — $6.99 (Consumable) — AI tutorial video for one recipe
+- [x] dishcraft.studio_monthly — $49.99/mo (Subscription) — Unlimited photos + 10 videos/month
+
+### Removed Products:
+- [x] Remove photo_pack_5
+- [x] Remove video_pack_5
+- [x] Remove unlimited_photos
+- [x] Remove unlimited_videos
+
+### Code Changes:
+- [x] Update RevenueCat product IDs and offerings
+- [x] Update lib/revenuecat.tsx with new products
+- [x] Update paywall.tsx with new 3-option layout
+- [x] Update credit system: Studio = unlimited photos + 10 videos/month
+- [x] Update entitlement checks (replace old with "studio_access")
+- [x] Remove pack/bundle logic
+- [x] Update Profile screen subscription display
+- [ ] Run tests and verify changes

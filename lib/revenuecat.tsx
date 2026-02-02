@@ -3,19 +3,14 @@
  * 
  * Handles subscription management and in-app purchases.
  * 
- * SUBSCRIPTIONS:
- * - unlimited_photos: $9.99/month (unlimited step photos, fair use 200/month)
- * - unlimited_videos: $29.99/month (unlimited videos, fair use 50/month)
- * 
- * ONE-TIME PURCHASES (consumable):
- * - step_photos_single: $1.99 (step photos for 1 recipe)
- * - video_single: $4.99 (video for 1 recipe)
- * - photo_pack_5: $7.49 (step photos for 5 recipes, save 25%)
- * - video_pack_5: $17.49 (videos for 5 recipes, save 30%)
+ * PRODUCTS (3 total):
+ * - dishcraft.photo_single: $1.99 (Consumable) - AI step photos for one recipe
+ * - dishcraft.video_single: $6.99 (Consumable) - AI tutorial video for one recipe
+ * - dishcraft.studio_monthly: $49.99/mo (Subscription) - Unlimited photos + 10 videos/month
  */
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { Platform, Alert } from "react-native";
+import { Platform } from "react-native";
 import Purchases, {
   CustomerInfo,
   PurchasesOffering,
@@ -28,38 +23,46 @@ const REVENUECAT_API_KEY = "appl_LoboVIxXHxHWrhkLQaTqgaRBlDe";
 
 // Entitlement identifiers
 export const ENTITLEMENTS = {
-  PHOTOS_ACCESS: "photos_access",    // For photo subscription
-  VIDEOS_ACCESS: "videos_access",    // For video subscription
+  STUDIO_ACCESS: "studio_access",    // For Studio subscription
 } as const;
 
 // Package identifiers (matching RevenueCat dashboard)
 export const PACKAGES = {
-  // Subscriptions
-  UNLIMITED_PHOTOS: "$rc_monthly",                    // $9.99/month
-  UNLIMITED_VIDEOS: "$rc_custom_unlimited_videos",    // $29.99/month
-  // One-time purchases
-  STEP_PHOTOS_SINGLE: "$rc_custom_step_photos_single", // $1.99
-  VIDEO_SINGLE: "$rc_custom_video_single",             // $4.99
-  PHOTO_PACK_5: "$rc_custom_photo_pack_5",             // $7.49
-  VIDEO_PACK_5: "$rc_custom_video_pack_5",             // $17.49
+  // One-time purchases (consumables)
+  PHOTO_SINGLE: "photo_single",           // $1.99 - AI step photos for one recipe
+  VIDEO_SINGLE: "video_single",           // $6.99 - AI tutorial video for one recipe
+  // Subscription
+  STUDIO_MONTHLY: "studio_monthly",       // $49.99/month - Unlimited photos + 10 videos/month
 } as const;
 
-// Fair use limits
-export const FAIR_USE_LIMITS = {
-  PHOTOS_PER_MONTH: 200,
-  VIDEOS_PER_MONTH: 50,
+// Product IDs for App Store Connect
+export const PRODUCT_IDS = {
+  PHOTO_SINGLE: "dishcraft.photo_single",
+  VIDEO_SINGLE: "dishcraft.video_single",
+  STUDIO_MONTHLY: "dishcraft.studio_monthly",
+} as const;
+
+// Fair use limits for Studio subscription
+export const STUDIO_LIMITS = {
+  PHOTOS_PER_MONTH: -1,  // Unlimited
+  VIDEOS_PER_MONTH: 10,  // 10 videos per month
+} as const;
+
+// Pricing display
+export const PRICING = {
+  PHOTO_SINGLE: "$1.99",
+  VIDEO_SINGLE: "$6.99",
+  STUDIO_MONTHLY: "$49.99/mo",
 } as const;
 
 interface RevenueCatContextType {
   isInitialized: boolean;
-  hasPhotosSubscription: boolean;
-  hasVideosSubscription: boolean;
+  hasStudioSubscription: boolean;
   customerInfo: CustomerInfo | null;
   offerings: PurchasesOffering | null;
   purchasePackage: (pkg: PurchasesPackage) => Promise<{ success: boolean; error?: string; customerInfo?: CustomerInfo }>;
   restorePurchases: () => Promise<{ success: boolean; error?: string; customerInfo?: CustomerInfo }>;
-  checkPhotosAccess: () => boolean;
-  checkVideosAccess: () => boolean;
+  checkStudioAccess: () => boolean;
   getPackageByIdentifier: (identifier: string) => PurchasesPackage | undefined;
   refreshCustomerInfo: () => Promise<void>;
 }
@@ -135,20 +138,13 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     };
   }, []);
 
-  // Check if user has photos subscription
-  const checkPhotosAccess = useCallback((): boolean => {
+  // Check if user has Studio subscription
+  const checkStudioAccess = useCallback((): boolean => {
     if (!customerInfo) return false;
-    return customerInfo.entitlements.active[ENTITLEMENTS.PHOTOS_ACCESS] !== undefined;
+    return customerInfo.entitlements.active[ENTITLEMENTS.STUDIO_ACCESS] !== undefined;
   }, [customerInfo]);
 
-  // Check if user has videos subscription
-  const checkVideosAccess = useCallback((): boolean => {
-    if (!customerInfo) return false;
-    return customerInfo.entitlements.active[ENTITLEMENTS.VIDEOS_ACCESS] !== undefined;
-  }, [customerInfo]);
-
-  const hasPhotosSubscription = checkPhotosAccess();
-  const hasVideosSubscription = checkVideosAccess();
+  const hasStudioSubscription = checkStudioAccess();
 
   // Purchase a package
   const purchasePackage = useCallback(async (pkg: PurchasesPackage): Promise<{ success: boolean; error?: string; customerInfo?: CustomerInfo }> => {
@@ -241,14 +237,12 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
 
   const value: RevenueCatContextType = {
     isInitialized,
-    hasPhotosSubscription,
-    hasVideosSubscription,
+    hasStudioSubscription,
     customerInfo,
     offerings,
     purchasePackage,
     restorePurchases,
-    checkPhotosAccess,
-    checkVideosAccess,
+    checkStudioAccess,
     getPackageByIdentifier,
     refreshCustomerInfo,
   };
@@ -268,13 +262,10 @@ export function useCanAccessFeature(feature: "photos" | "videos"): {
   reason?: string;
   requiresUpgrade: boolean;
 } {
-  const { hasPhotosSubscription, hasVideosSubscription, customerInfo } = useRevenueCat();
+  const { hasStudioSubscription } = useRevenueCat();
 
-  // Check subscription access
-  if (feature === "photos" && hasPhotosSubscription) {
-    return { canAccess: true, requiresUpgrade: false };
-  }
-  if (feature === "videos" && hasVideosSubscription) {
+  // Studio subscribers have access to both photos and videos
+  if (hasStudioSubscription) {
     return { canAccess: true, requiresUpgrade: false };
   }
 
@@ -284,8 +275,8 @@ export function useCanAccessFeature(feature: "photos" | "videos"): {
   return {
     canAccess: false,
     reason: feature === "photos" 
-      ? "Subscribe to Unlimited Photos ($9.99/mo) or purchase a photo pack."
-      : "Subscribe to Unlimited Videos ($29.99/mo) or purchase a video pack.",
+      ? "Purchase Photo Single ($1.99) or subscribe to Dishcraft Studio ($49.99/mo)."
+      : "Purchase Video Single ($6.99) or subscribe to Dishcraft Studio ($49.99/mo).",
     requiresUpgrade: true,
   };
 }
