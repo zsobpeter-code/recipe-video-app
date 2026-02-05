@@ -20,7 +20,7 @@ export async function storagePut(
   contentType = "application/octet-stream",
 ): Promise<{ key: string; url: string }> {
   const key = normalizeKey(relKey);
-  const bucketName = "generated-files";
+  const bucketName = "recipe-images";
 
   // Convert data to Buffer if needed
   const buffer = typeof data === "string" ? Buffer.from(data) : Buffer.from(data);
@@ -55,7 +55,7 @@ export async function storagePut(
 
 export async function storageGet(relKey: string): Promise<{ key: string; url: string }> {
   const key = normalizeKey(relKey);
-  const bucketName = "generated-files";
+  const bucketName = "recipe-images";
 
   try {
     // Get public URL
