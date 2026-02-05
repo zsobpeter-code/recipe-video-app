@@ -1,6 +1,7 @@
 /**
  * Demo recipes for testing the app flow.
  * These are pre-populated recipes that can be loaded for demonstration purposes.
+ * IDs are now proper UUIDs to match database schema requirements.
  */
 
 export interface DemoRecipe {
@@ -26,7 +27,7 @@ export interface DemoRecipe {
 
 export const DEMO_RECIPES: DemoRecipe[] = [
   {
-    id: "demo-1",
+    id: "550e8400-e29b-41d4-a716-446655440001",
     title: "Classic Spaghetti Carbonara",
     description: "A creamy Italian pasta dish with crispy pancetta, eggs, and Parmesan cheese.",
     cuisine: "Italian",
@@ -57,7 +58,7 @@ export const DEMO_RECIPES: DemoRecipe[] = [
     isFavorite: true,
   },
   {
-    id: "demo-2",
+    id: "550e8400-e29b-41d4-a716-446655440002",
     title: "Thai Green Curry",
     description: "Aromatic coconut curry with vegetables and your choice of protein.",
     cuisine: "Thai",
@@ -90,7 +91,7 @@ export const DEMO_RECIPES: DemoRecipe[] = [
     isFavorite: false,
   },
   {
-    id: "demo-3",
+    id: "550e8400-e29b-41d4-a716-446655440003",
     title: "Creamy Tomato Soup",
     description: "Velvety smooth tomato soup with fresh basil and a touch of cream.",
     cuisine: "American",
@@ -122,7 +123,7 @@ export const DEMO_RECIPES: DemoRecipe[] = [
     isFavorite: true,
   },
   {
-    id: "demo-4",
+    id: "550e8400-e29b-41d4-a716-446655440004",
     title: "Chocolate Lava Cake",
     description: "Decadent individual chocolate cakes with a molten center.",
     cuisine: "French",
@@ -154,7 +155,7 @@ export const DEMO_RECIPES: DemoRecipe[] = [
     isFavorite: false,
   },
   {
-    id: "demo-5",
+    id: "550e8400-e29b-41d4-a716-446655440005",
     title: "Avocado Toast with Poached Egg",
     description: "Trendy breakfast classic with creamy avocado and perfectly poached eggs.",
     cuisine: "Modern",
@@ -186,7 +187,7 @@ export const DEMO_RECIPES: DemoRecipe[] = [
     isFavorite: true,
   },
   {
-    id: "demo-6",
+    id: "550e8400-e29b-41d4-a716-446655440006",
     title: "Japanese Miso Ramen",
     description: "Rich and savory miso-based ramen with chashu pork and soft-boiled egg.",
     cuisine: "Japanese",
