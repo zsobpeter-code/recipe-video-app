@@ -488,6 +488,9 @@ export default function VideoGenerationScreen() {
 
         // Navigate to video player after short delay
         setTimeout(() => {
+          // Fallback: if concatenation failed, use first completed video URL for sharing
+          const firstVideoUrl = generatedVideos.find(v => v.status === "completed" && v.videoUrl)?.videoUrl;
+          
           router.replace({
             pathname: "/video-player" as any,
             params: {
@@ -497,6 +500,7 @@ export default function VideoGenerationScreen() {
               enrichedSteps: enrichedSteps ? JSON.stringify(enrichedSteps) : undefined,
               stepVideos: JSON.stringify(generatedVideos),
               finalVideoPath: concatenatedVideoPath || undefined,
+              finalVideoUrl: concatenatedVideoPath ? undefined : firstVideoUrl,
             },
           });
         }, 1500);
