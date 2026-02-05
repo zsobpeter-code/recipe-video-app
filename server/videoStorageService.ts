@@ -256,13 +256,13 @@ export async function generateSingleStepVideo(
   console.log(`[VideoStorage] Input imageUrl:`, imageUrl?.substring(0, 100));
   
   try {
-    // Use the new retry-enabled function
+      // Use the new retry-enabled function
     const tempVideoUrl = await generateVideoWithRetry(
       imageUrl,
       prompt,
       stepIndex,
       2, // max 2 retries
-      3 * 60 * 1000 // 3 minute timeout per attempt
+      10 * 60 * 1000 // 10 minute timeout per attempt (Runway Gen-3 can take time)
     );
     
     if (!tempVideoUrl) {
