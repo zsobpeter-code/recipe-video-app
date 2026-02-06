@@ -195,13 +195,13 @@ describe("Phase 4 & 5: Video Generation & Monetization", () => {
       expect(content).toContain('name="video-player"');
     });
 
-    it("should have generate video button connected to paywall", () => {
+    it("should have generate video button connected to TikTok generation", () => {
       const recipeCardPath = path.join(projectRoot, "app/recipe-card.tsx");
       const content = fs.readFileSync(recipeCardPath, "utf-8");
       
-      expect(content).toContain("handleGenerateVideo");
-      expect(content).toContain("/paywall");
-      expect(content).toContain("recipeData");
+      expect(content).toContain("handleGenerateTikTokVideo");
+      expect(content).toContain("tikTokGenerate");
+      expect(content).toContain("Generate TikTok Video");
     });
   });
 

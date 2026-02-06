@@ -68,10 +68,10 @@ export default function CollectionScreen() {
     }
     
     router.push({
-      pathname: "/decision-point" as any,
+      pathname: "/recipe-card" as any,
       params: {
         recipeId: recipe.id,
-        imageUri: recipe.imageUrl || "",
+        imageUri: ("heroImage" in recipe ? recipe.heroImage : "") || recipe.imageUrl || "",
         dishName: recipe.dishName,
         description: recipe.description,
         cuisine: recipe.cuisine || "",
@@ -82,6 +82,9 @@ export default function CollectionScreen() {
         ingredients: recipe.ingredients,
         steps: recipe.steps,
         tags: recipe.tags || "[]",
+        tikTokVideoUrl: ("tikTokVideo" in recipe ? recipe.tikTokVideo : "") || "",
+        canRegen: ("videoRegenUsed" in recipe && recipe.videoRegenUsed) ? "false" : "true",
+        stepImages: ("stepImages" in recipe ? recipe.stepImages : "[]") || "[]",
       },
     });
   };

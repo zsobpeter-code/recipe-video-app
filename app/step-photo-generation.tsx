@@ -335,7 +335,7 @@ export default function StepPhotoGenerationScreen() {
                   style={styles.viewButton}
                   onPress={() => {
                     router.replace({
-                      pathname: "/cook-mode" as any,
+                      pathname: "/recipe-card" as any,
                       params: {
                         dishName: params.dishName,
                         recipeData: params.recipeData,

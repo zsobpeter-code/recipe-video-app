@@ -79,8 +79,9 @@ describe("AI Integration Tests", () => {
       const screenPath = path.join(process.cwd(), "app/recipe-card.tsx");
       const content = fs.readFileSync(screenPath, "utf-8");
       
-      expect(content).toContain("expandedSection");
-      expect(content).toContain("toggleSection");
+      expect(content).toContain("ingredientsExpanded");
+      expect(content).toContain("toggleIngredients");
+      expect(content).toContain("toggleSteps");
       expect(content).toContain("ingredients");
       expect(content).toContain("steps");
     });
@@ -91,17 +92,16 @@ describe("AI Integration Tests", () => {
       
       expect(content).toContain("Video");
       expect(content).toContain("Save");
-      expect(content).toContain("Cook");
-      expect(content).toContain("handleGenerateVideo");
+      expect(content).toContain("handleGenerateTikTokVideo");
       expect(content).toContain("handleSaveToCollection");
-      expect(content).toContain("handleCookMode");
+      expect(content).toContain("handleShareVideo");
     });
 
-    it("should use glassmorphism card component", () => {
+    it("should use LinearGradient for premium CTA styling", () => {
       const screenPath = path.join(process.cwd(), "app/recipe-card.tsx");
       const content = fs.readFileSync(screenPath, "utf-8");
       
-      expect(content).toContain("GlassmorphismCard");
+      expect(content).toContain("LinearGradient");
     });
 
     it("should display recipe stats (time, servings, difficulty)", () => {
@@ -220,11 +220,11 @@ describe("AI Integration Tests", () => {
       expect(content).toContain("alternatives");
     });
 
-    it("should navigate to decision-point on confirm (V2 flow)", () => {
+    it("should navigate to recipe-card on confirm (V2.1 flow)", () => {
       const screenPath = path.join(process.cwd(), "app/refinement.tsx");
       const content = fs.readFileSync(screenPath, "utf-8");
       
-      expect(content).toContain("/decision-point");
+      expect(content).toContain("/recipe-card");
     });
 
     it("should be registered in Stack navigator", () => {

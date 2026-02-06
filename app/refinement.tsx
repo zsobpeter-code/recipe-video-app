@@ -85,7 +85,7 @@ export default function RefinementScreen() {
         }
         // Navigate to decision point screen with NEW recipe data (V2)
         router.replace({
-          pathname: "/decision-point" as any,
+          pathname: "/recipe-card" as any,
           params: {
             imageUri: params.imageUri,
             dishName: data.recipe.dishName,
@@ -183,7 +183,7 @@ export default function RefinementScreen() {
   const navigateToRecipeCardWithOriginal = (dishName: string) => {
     // Navigate to decision point screen (V2) with original recipe data
     router.replace({
-      pathname: "/decision-point" as any,
+      pathname: "/recipe-card" as any,
       params: {
         imageUri: params.imageUri,
         dishName,

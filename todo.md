@@ -977,27 +977,61 @@ Remove old packages ($rc_monthly, $rc_annual, $rc_custom_*) and create:
 ## V2 Bug Fixes (2026-02-06 Testing)
 
 ### BUG 1: Steps not loading in Cook Mode (CRITICAL)
-- [ ] Fix recipe steps not being saved/loaded — shows "STEP 1 OF 0"
-- [ ] Ensure steps[] is populated during AI recognition and passed through navigation
+- [x] Fix recipe steps not being saved/loaded — shows "STEP 1 OF 0"
+- [x] Ensure steps[] is populated during AI recognition and passed through navigation
 
 ### BUG 2: User's own photo blocked from video generation (CRITICAL)
-- [ ] Remove forced AI photo requirement for video generation
-- [ ] Allow user's uploaded food photo as hero image for Runway video
-- [ ] Any image in images[] should work as hero reference
+- [x] Remove forced AI photo requirement for video generation
+- [x] Allow user's uploaded food photo as hero image for Runway video
+- [x] Any image in images[] should work as hero reference
 
 ### BUG 3: Step photos wrongly required for video (CRITICAL)
-- [ ] Remove step photo dependency from video generation flow
-- [ ] Video pipeline: RecipeCard → Prompt Builder → Runway API (no step photos)
-- [ ] Remove "Step Photos Needed" dialog from Cook Mode video button
+- [x] Remove step photo dependency from video generation flow
+- [x] Video pipeline: RecipeCard → Prompt Builder → Runway API (no step photos)
+- [x] Remove "Step Photos Needed" dialog from Cook Mode video button
 
 ### BUG 4: Video price wrong ($4.99 → $6.99) (MEDIUM)
-- [ ] Update price display from $4.99 to $6.99 on Decision Point Screen
+- [x] Update price display from $4.99 to $6.99 on Decision Point Screen
 
 ### BUG 5: Decision Point Screen layout doesn't match V2 spec (HIGH)
-- [ ] Add scrollable recipe title + meta section
-- [ ] Add collapsed ingredients list (show 3-4, "+ X more")
-- [ ] Add collapsed steps list (show 2-3, "+ X more steps")
-- [ ] Add hero image area (tappable to change)
-- [ ] PRIMARY CTA: big gold full-width "Generate TikTok Video $6.99"
-- [ ] SECONDARY CTA: smaller "Also generate step images $1.99"
-- [ ] Move Full Recipe and Cook Mode to less prominent position
+- [x] Add scrollable recipe title + meta section
+- [x] Add collapsed ingredients list (show 3-4, "+ X more")
+- [x] Add collapsed steps list (show 2-3, "+ X more steps")
+- [x] Add hero image area (tappable to change)
+- [x] PRIMARY CTA: big gold full-width "Generate TikTok Video $6.99"
+- [x] SECONDARY CTA: smaller "Also generate step images $1.99"
+- [x] Move Full Recipe and Cook Mode to less prominent position
+
+## V2.1 — Major Flow Restructure (2026-02-06)
+
+### DELETE Screens
+- [x] Delete Cook Mode screen (app/cook-mode.tsx)
+- [x] Delete decision-point.tsx (merged into RecipeCard)
+- [x] Remove "Full Recipe" button from navigation
+- [x] Remove "Cook Mode" button from navigation
+
+### Rebuild RecipeCard as Single Unified Screen
+- [x] Hero image (full width, tappable to change/upload)
+- [x] Cuisine tag + recipe title + description + metadata
+- [x] Collapsible Ingredients section (collapsed by default, show count)
+- [x] Collapsible Steps section (collapsed by default, show count)
+- [x] Sticky video CTA (always visible when scrolling)
+- [x] Inline video player (replaces CTA when video ready)
+- [x] Share Video + Regenerate buttons below inline player
+- [x] Step Images $1.99 secondary CTA
+- [x] Save / Share Recipe / PDF bottom bar
+
+### Bug Fixes (V2.1)
+- [x] BUG: Price still shows $4.99 in some places — replace all with $6.99
+- [x] BUG: "Photo Required" alert — use user's uploaded photo directly as hero
+- [x] BUG: Video generation still depends on step photos — remove ALL dependency
+
+### Navigation Changes
+- [x] Update refinement.tsx → navigate to unified RecipeCard
+- [x] Update collection.tsx → navigate to unified RecipeCard
+- [x] Update index.tsx → navigate to unified RecipeCard
+- [x] Update step-photo-generation.tsx → navigate to unified RecipeCard
+- [x] Remove decision-point from Stack.Screen in _layout.tsx
+- [x] Pass tikTokVideoUrl, canRegen, stepImages from collection/index to recipe-card
+- [x] All 158 tests passing after V2.1 migration
+- [x] 0 TypeScript errors

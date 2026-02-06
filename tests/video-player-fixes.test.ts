@@ -87,18 +87,17 @@ describe("Video Player Bug Fixes", () => {
     });
   });
 
-  describe("BUG 5: AI Photo functionality on Recipe Card", () => {
-    it("should have AI photo generation handler", () => {
-      // Free AI photo button was removed, but handler still exists for paid flow
-      expect(recipeCardContent).toContain("handleGenerateAIPhoto");
+  describe("BUG 5: Step Images and Video functionality on Recipe Card", () => {
+    it("should have step images generation handler", () => {
+      expect(recipeCardContent).toContain("handleGenerateStepImages");
     });
 
-    it("should call generateImage mutation", () => {
-      expect(recipeCardContent).toContain("generateAIImage.mutateAsync");
+    it("should have TikTok video generation handler", () => {
+      expect(recipeCardContent).toContain("handleGenerateTikTokVideo");
     });
 
-    it("should update generatedPhotoUri on success", () => {
-      expect(recipeCardContent).toContain("setGeneratedPhotoUri");
+    it("should have video regeneration handler", () => {
+      expect(recipeCardContent).toContain("handleRegenerateVideo");
     });
   });
 
