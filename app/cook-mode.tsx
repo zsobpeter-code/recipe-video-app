@@ -349,51 +349,30 @@ export default function CookModeScreen() {
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
-    
-    // Check if we have an HTTPS image for video generation
-    const hasHttpsImage = params.imageUri?.startsWith("https://") || params.stepImages;
-    
-    if (!hasHttpsImage && !hasVideos) {
-      // No HTTPS image available - prompt user to generate step photos first
-      Alert.alert(
-        "Step Photos Needed",
-        "To create your video, we first need to generate step-by-step photos. This is included with video purchase.",
-        [
-          { text: "Cancel", style: "cancel" },
-          { text: "Generate Photos & Video", onPress: handlePhotos },
-        ]
-      );
-      return;
-    }
-    
-    // If videos are already cached, go directly to video player
-    if (hasVideos) {
-      router.push({
-        pathname: "/video-generation" as any,
-        params: {
-          dishName: params.dishName,
-          recipeData: params.recipeData,
-          imageUri: params.imageUri,
-          cachedStepVideos: params.stepVideos,
-          userId: params.userId,
-          recipeId: params.recipeId,
-          stepImages: params.stepImages, // Pass step images with HTTPS URLs
-        },
-      });
-      return;
-    }
-    
-    // Navigate to paywall for video
+
+    // V2: Navigate directly to TikTok video generation
+    // No step photo dependency — uses hero image (user's own photo)
+    const heroImageUrl = params.imageUri || "";
+
+    // Parse recipe data for steps/ingredients if available
+    let recipeParsed: Record<string, unknown> = {};
+    try {
+      if (params.recipeData) {
+        recipeParsed = JSON.parse(params.recipeData);
+      }
+    } catch { /* ignore */ }
+
     router.push({
-      pathname: "/paywall" as any,
+      pathname: "/tiktok-generation" as any,
       params: {
-        productType: "video",
+        recipeId: params.recipeId || "",
+        heroImageUrl: heroImageUrl,
         dishName: params.dishName,
-        recipeData: params.recipeData,
-        imageUri: params.imageUri,
-        userId: params.userId,
-        recipeId: params.recipeId,
-        stepImages: params.stepImages, // Pass step images with HTTPS URLs
+        description: (recipeParsed.description as string) || "",
+        cuisine: (recipeParsed.cuisine as string) || "",
+        ingredients: recipeParsed.ingredients ? JSON.stringify(recipeParsed.ingredients) : "[]",
+        steps: recipeParsed.steps ? JSON.stringify(recipeParsed.steps) : params.recipeData || "[]",
+        userId: params.userId || "",
       },
     });
   };
@@ -568,7 +547,7 @@ export default function CookModeScreen() {
           />
           <PrimaryButton
             title={hasVideos ? "Watch" : "Make Video"}
-            subtitle={hasVideos ? undefined : "$4.99"}
+            subtitle={hasVideos ? undefined : "$6.99"}
             onPress={handleGenerateVideo}
             style={{ flex: 1 }}
           />

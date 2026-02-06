@@ -788,7 +788,7 @@ export default function RecipeCardScreen() {
         />
         <SecondaryButton
           title={hasVideos ? "Watch" : "Video"}
-          subtitle={hasVideos ? undefined : "$4.99"}
+          subtitle={hasVideos ? undefined : "$6.99"}
           onPress={handleGenerateVideo}
           icon={<IconSymbol name="video.fill" size={16} color="#C9A962" />}
           style={{ flex: 1 }}

@@ -38,6 +38,7 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { trpc } from "@/lib/trpc";
+import * as FileSystem from "expo-file-system/legacy";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -199,30 +200,68 @@ export default function TikTokGenerationScreen() {
     },
   });
 
+  // Upload image mutation (for local file:// URIs)
+  const uploadMutation = trpc.recipe.uploadImage.useMutation();
+
+  // Upload local image to Supabase and return HTTPS URL
+  const uploadLocalImage = useCallback(async (localUri: string): Promise<string> => {
+    try {
+      const base64 = await FileSystem.readAsStringAsync(localUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      const fileName = `hero-${params.recipeId || Date.now()}.jpg`;
+      const result = await uploadMutation.mutateAsync({
+        imageBase64: base64,
+        fileName,
+      });
+      if (result.success && result.url) {
+        return result.url;
+      }
+      throw new Error(result.error || "Upload failed");
+    } catch (err: any) {
+      throw new Error(`Image upload failed: ${err.message}`);
+    }
+  }, [params.recipeId, uploadMutation]);
+
   // Start generation on mount
   useEffect(() => {
     setStage("building_prompt");
 
-    // Small delay for UX
-    const timer = setTimeout(() => {
-      setStage("generating_video");
-      generateMutation.mutate({
-        recipeId: params.recipeId,
-        heroImageUrl: params.heroImageUrl,
-        title: params.dishName,
-        ingredients: ingredients.map((i: any) => ({
-          name: typeof i === "string" ? i : i.name || "",
-          amount: i.amount,
-          unit: i.unit,
-        })),
-        steps: steps.map(s => ({
-          instruction: s.instruction,
-          stepNumber: s.stepNumber,
-        })),
-        cuisineStyle: params.cuisine,
-      });
-    }, 1500);
+    const startGeneration = async () => {
+      try {
+        // If hero image is a local file, upload it first
+        let heroUrl = params.heroImageUrl;
+        if (heroUrl && !heroUrl.startsWith("https://")) {
+          heroUrl = await uploadLocalImage(heroUrl);
+        }
 
+        setStage("generating_video");
+        generateMutation.mutate({
+          recipeId: params.recipeId,
+          heroImageUrl: heroUrl,
+          title: params.dishName,
+          ingredients: ingredients.map((i: any) => ({
+            name: typeof i === "string" ? i : i.name || "",
+            amount: i.amount,
+            unit: i.unit,
+          })),
+          steps: steps.map(s => ({
+            instruction: s.instruction,
+            stepNumber: s.stepNumber,
+          })),
+          cuisineStyle: params.cuisine,
+        });
+      } catch (err: any) {
+        setStage("failed");
+        setError(err.message || "Failed to prepare image");
+        if (Platform.OS !== "web") {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        }
+      }
+    };
+
+    // Small delay for UX
+    const timer = setTimeout(startGeneration, 1500);
     return () => clearTimeout(timer);
   }, []);
 

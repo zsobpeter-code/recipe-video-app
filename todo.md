@@ -973,3 +973,31 @@ Remove old packages ($rc_monthly, $rc_annual, $rc_custom_*) and create:
 - [x] Video button = BIG, orange, primary
 - [x] Step images button = smaller, grey, secondary
 - [x] Update recipe-card.tsx button hierarchy
+
+## V2 Bug Fixes (2026-02-06 Testing)
+
+### BUG 1: Steps not loading in Cook Mode (CRITICAL)
+- [ ] Fix recipe steps not being saved/loaded — shows "STEP 1 OF 0"
+- [ ] Ensure steps[] is populated during AI recognition and passed through navigation
+
+### BUG 2: User's own photo blocked from video generation (CRITICAL)
+- [ ] Remove forced AI photo requirement for video generation
+- [ ] Allow user's uploaded food photo as hero image for Runway video
+- [ ] Any image in images[] should work as hero reference
+
+### BUG 3: Step photos wrongly required for video (CRITICAL)
+- [ ] Remove step photo dependency from video generation flow
+- [ ] Video pipeline: RecipeCard → Prompt Builder → Runway API (no step photos)
+- [ ] Remove "Step Photos Needed" dialog from Cook Mode video button
+
+### BUG 4: Video price wrong ($4.99 → $6.99) (MEDIUM)
+- [ ] Update price display from $4.99 to $6.99 on Decision Point Screen
+
+### BUG 5: Decision Point Screen layout doesn't match V2 spec (HIGH)
+- [ ] Add scrollable recipe title + meta section
+- [ ] Add collapsed ingredients list (show 3-4, "+ X more")
+- [ ] Add collapsed steps list (show 2-3, "+ X more steps")
+- [ ] Add hero image area (tappable to change)
+- [ ] PRIMARY CTA: big gold full-width "Generate TikTok Video $6.99"
+- [ ] SECONDARY CTA: smaller "Also generate step images $1.99"
+- [ ] Move Full Recipe and Cook Mode to less prominent position
