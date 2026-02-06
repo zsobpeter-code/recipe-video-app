@@ -550,6 +550,131 @@ Generate the complete, authentic recipe for "${dishName}".`;
           };
         }
       }),
+
+    // V2: Generate TikTok cooking video from hero image + recipe data
+    generateTikTokVideo: publicProcedure
+      .input(z.object({
+        recipeId: z.string().describe("Recipe ID for storage and DB update"),
+        heroImageUrl: z.string().describe("HTTPS URL of the hero image"),
+        title: z.string().describe("Recipe title"),
+        ingredients: z.array(z.object({
+          name: z.string(),
+          amount: z.string().optional(),
+          unit: z.string().optional(),
+        })),
+        steps: z.array(z.object({
+          instruction: z.string(),
+          stepNumber: z.number().optional(),
+        })),
+        cuisineStyle: z.string().optional(),
+        heroMoment: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          const { generateTikTokVideo } = await import("./tikTokVideoService");
+          const { updateTikTokVideo } = await import("./recipeDb");
+
+          const result = await generateTikTokVideo(
+            input.recipeId,
+            input.heroImageUrl,
+            {
+              title: input.title,
+              ingredients: input.ingredients,
+              steps: input.steps,
+              cuisineStyle: input.cuisineStyle,
+              heroMoment: input.heroMoment,
+            }
+          );
+
+          if (result.success && result.videoUrl) {
+            // Store video URL in database
+            await updateTikTokVideo(input.recipeId, result.videoUrl);
+
+            return {
+              success: true,
+              videoUrl: result.videoUrl,
+              generationTimeMs: result.generationTimeMs,
+            };
+          } else {
+            return {
+              success: false,
+              error: result.error || "Video generation failed",
+              videoUrl: null,
+              generationTimeMs: result.generationTimeMs,
+            };
+          }
+        } catch (error) {
+          console.error("TikTok video generation error:", error);
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to generate TikTok video",
+            videoUrl: null,
+          };
+        }
+      }),
+
+    // V2: Regenerate TikTok video (free regen, different prompt/seed)
+    regenerateTikTokVideo: publicProcedure
+      .input(z.object({
+        recipeId: z.string().describe("Recipe ID"),
+        heroImageUrl: z.string().describe("HTTPS URL of the hero image"),
+        title: z.string(),
+        ingredients: z.array(z.object({
+          name: z.string(),
+          amount: z.string().optional(),
+          unit: z.string().optional(),
+        })),
+        steps: z.array(z.object({
+          instruction: z.string(),
+          stepNumber: z.number().optional(),
+        })),
+        cuisineStyle: z.string().optional(),
+        heroMoment: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          const { regenerateTikTokVideo } = await import("./tikTokVideoService");
+          const { updateTikTokVideo, markVideoRegenUsed } = await import("./recipeDb");
+
+          const result = await regenerateTikTokVideo(
+            input.recipeId,
+            input.heroImageUrl,
+            {
+              title: input.title,
+              ingredients: input.ingredients,
+              steps: input.steps,
+              cuisineStyle: input.cuisineStyle,
+              heroMoment: input.heroMoment,
+            }
+          );
+
+          if (result.success && result.videoUrl) {
+            // Update video URL and mark regen as used
+            await updateTikTokVideo(input.recipeId, result.videoUrl);
+            await markVideoRegenUsed(input.recipeId);
+
+            return {
+              success: true,
+              videoUrl: result.videoUrl,
+              generationTimeMs: result.generationTimeMs,
+            };
+          } else {
+            return {
+              success: false,
+              error: result.error || "Regeneration failed",
+              videoUrl: null,
+              generationTimeMs: result.generationTimeMs,
+            };
+          }
+        } catch (error) {
+          console.error("TikTok video regeneration error:", error);
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to regenerate TikTok video",
+            videoUrl: null,
+          };
+        }
+      }),
   }),
 });
 

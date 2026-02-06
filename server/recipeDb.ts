@@ -51,6 +51,13 @@ export interface DbRecipe {
   final_video_url: string | null;
   generated_image_url: string | null;
   primary_image_url: string | null;
+  // V2 fields
+  cuisine_style: string | null;
+  hero_moment: string | null;
+  images: any; // JSONB array of image URLs
+  hero_image: string | null;
+  tiktok_video: string | null;
+  video_regen_used: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -73,6 +80,11 @@ export interface RecipeInput {
   originalImageUrl?: string | null;
   stepImages?: string | null; // JSON string
   stepVideos?: string | null; // JSON string
+  // V2 fields
+  cuisineStyle?: string | null;
+  heroMoment?: string | null;
+  images?: string | null; // JSON string array of image URLs
+  heroImage?: string | null;
 }
 
 // SavedRecipe interface for API responses (matches existing tRPC interface)
@@ -97,6 +109,13 @@ export interface SavedRecipe {
   stepImages: string | null;
   stepVideos: string | null;
   finalVideoUrl: string | null;
+  // V2 fields
+  cuisineStyle: string | null;
+  heroMoment: string | null;
+  images: string | null; // JSON string array
+  heroImage: string | null;
+  tikTokVideo: string | null;
+  videoRegenUsed: boolean;
   isFavorite: boolean;
   createdAt: string;
   updatedAt: string;
@@ -125,6 +144,13 @@ function dbToSavedRecipe(row: DbRecipe): SavedRecipe {
     stepImages: typeof row.step_images === "string" ? row.step_images : JSON.stringify(row.step_images || []),
     stepVideos: typeof row.step_videos === "string" ? row.step_videos : JSON.stringify(row.step_videos || []),
     finalVideoUrl: row.final_video_url,
+    // V2 fields
+    cuisineStyle: row.cuisine_style || null,
+    heroMoment: row.hero_moment || null,
+    images: typeof row.images === "string" ? row.images : JSON.stringify(row.images || []),
+    heroImage: row.hero_image || null,
+    tikTokVideo: row.tiktok_video || null,
+    videoRegenUsed: row.video_regen_used || false,
     isFavorite: row.is_favorite || false,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -187,6 +213,13 @@ export async function createRecipe(input: RecipeInput): Promise<{ success: boole
         step_videos: input.stepVideos ? JSON.parse(input.stepVideos) : [],
         video_status: "none",
         is_favorite: false,
+        // V2 fields
+        cuisine_style: input.cuisineStyle || null,
+        hero_moment: input.heroMoment || null,
+        images: input.images ? JSON.parse(input.images) : [],
+        hero_image: input.heroImage || null,
+        tiktok_video: null,
+        video_regen_used: false,
       })
       .select()
       .single();
@@ -605,5 +638,206 @@ export async function getCachedFinalVideoUrl(recipeId: string): Promise<string |
     return data.final_video_url || null;
   } catch {
     return null;
+  }
+}
+
+
+// ==========================================
+// V2 — TikTok Video Generator Functions
+// ==========================================
+
+/**
+ * Update cuisine style and hero moment for a recipe (set during analysis)
+ */
+export async function updateRecipeV2Fields(
+  recipeId: string,
+  fields: { cuisineStyle?: string; heroMoment?: string; images?: any[]; heroImage?: string }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const updateData: any = { updated_at: new Date().toISOString() };
+    if (fields.cuisineStyle !== undefined) updateData.cuisine_style = fields.cuisineStyle;
+    if (fields.heroMoment !== undefined) updateData.hero_moment = fields.heroMoment;
+    if (fields.images !== undefined) updateData.images = fields.images;
+    if (fields.heroImage !== undefined) updateData.hero_image = fields.heroImage;
+
+    const { error } = await supabaseAdmin
+      .from("recipes")
+      .update(updateData)
+      .eq("id", recipeId);
+
+    if (error) {
+      console.error("[RecipeDB] Update V2 fields error:", error);
+      return { success: false, error: error.message };
+    }
+
+    console.log(`[RecipeDB] Updated V2 fields for ${recipeId}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error("[RecipeDB] Update V2 fields error:", error);
+    return { success: false, error: error?.message || "Failed to update V2 fields" };
+  }
+}
+
+/**
+ * Update hero image selection for a recipe
+ */
+export async function updateHeroImage(recipeId: string, heroImageUrl: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { error } = await supabaseAdmin
+      .from("recipes")
+      .update({ hero_image: heroImageUrl, updated_at: new Date().toISOString() })
+      .eq("id", recipeId);
+
+    if (error) {
+      console.error("[RecipeDB] Update hero image error:", error);
+      return { success: false, error: error.message };
+    }
+
+    console.log(`[RecipeDB] Updated hero image for ${recipeId}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error("[RecipeDB] Update hero image error:", error);
+    return { success: false, error: error?.message || "Failed to update hero image" };
+  }
+}
+
+/**
+ * Add an image to the recipe's images array
+ */
+export async function addRecipeImage(recipeId: string, imageUrl: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Get current images
+    const { data, error: getError } = await supabaseAdmin
+      .from("recipes")
+      .select("images")
+      .eq("id", recipeId)
+      .single();
+
+    if (getError) {
+      return { success: false, error: "Recipe not found" };
+    }
+
+    const currentImages = Array.isArray(data.images) ? data.images : [];
+    const updatedImages = [...currentImages, imageUrl];
+
+    const { error } = await supabaseAdmin
+      .from("recipes")
+      .update({ images: updatedImages, updated_at: new Date().toISOString() })
+      .eq("id", recipeId);
+
+    if (error) {
+      console.error("[RecipeDB] Add recipe image error:", error);
+      return { success: false, error: error.message };
+    }
+
+    console.log(`[RecipeDB] Added image to ${recipeId}, total: ${updatedImages.length}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error("[RecipeDB] Add recipe image error:", error);
+    return { success: false, error: error?.message || "Failed to add recipe image" };
+  }
+}
+
+/**
+ * Update TikTok video URL for a recipe
+ */
+export async function updateTikTokVideo(recipeId: string, videoUrl: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { error } = await supabaseAdmin
+      .from("recipes")
+      .update({ 
+        tiktok_video: videoUrl,
+        video_status: "completed",
+        updated_at: new Date().toISOString() 
+      })
+      .eq("id", recipeId);
+
+    if (error) {
+      console.error("[RecipeDB] Update TikTok video error:", error);
+      return { success: false, error: error.message };
+    }
+
+    console.log(`[RecipeDB] Updated TikTok video for ${recipeId}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error("[RecipeDB] Update TikTok video error:", error);
+    return { success: false, error: error?.message || "Failed to update TikTok video" };
+  }
+}
+
+/**
+ * Mark that free video regeneration has been used
+ */
+export async function markVideoRegenUsed(recipeId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { error } = await supabaseAdmin
+      .from("recipes")
+      .update({ video_regen_used: true, updated_at: new Date().toISOString() })
+      .eq("id", recipeId);
+
+    if (error) {
+      console.error("[RecipeDB] Mark regen used error:", error);
+      return { success: false, error: error.message };
+    }
+
+    console.log(`[RecipeDB] Marked regen used for ${recipeId}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error("[RecipeDB] Mark regen used error:", error);
+    return { success: false, error: error?.message || "Failed to mark regen used" };
+  }
+}
+
+/**
+ * Check if TikTok video exists for a recipe (for caching)
+ */
+export async function hasTikTokVideo(recipeId: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("recipes")
+      .select("tiktok_video")
+      .eq("id", recipeId)
+      .single();
+
+    if (error || !data) return false;
+    return !!data.tiktok_video;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get cached TikTok video URL for a recipe
+ */
+export async function getCachedTikTokVideo(recipeId: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("recipes")
+      .select("tiktok_video, video_regen_used")
+      .eq("id", recipeId)
+      .single();
+
+    if (error || !data) return null;
+    return data.tiktok_video || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get video regen status for a recipe
+ */
+export async function getVideoRegenStatus(recipeId: string): Promise<{ hasVideo: boolean; regenUsed: boolean }> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("recipes")
+      .select("tiktok_video, video_regen_used")
+      .eq("id", recipeId)
+      .single();
+
+    if (error || !data) return { hasVideo: false, regenUsed: false };
+    return { hasVideo: !!data.tiktok_video, regenUsed: data.video_regen_used || false };
+  } catch {
+    return { hasVideo: false, regenUsed: false };
   }
 }

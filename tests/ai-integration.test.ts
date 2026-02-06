@@ -220,11 +220,11 @@ describe("AI Integration Tests", () => {
       expect(content).toContain("alternatives");
     });
 
-    it("should navigate to recipe-card on confirm", () => {
+    it("should navigate to decision-point on confirm (V2 flow)", () => {
       const screenPath = path.join(process.cwd(), "app/refinement.tsx");
       const content = fs.readFileSync(screenPath, "utf-8");
       
-      expect(content).toContain("/recipe-card");
+      expect(content).toContain("/decision-point");
     });
 
     it("should be registered in Stack navigator", () => {

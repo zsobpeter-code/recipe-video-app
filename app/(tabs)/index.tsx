@@ -90,7 +90,7 @@ export default function HomeScreen() {
     }
     
     router.push({
-      pathname: "/recipe-card" as any,
+      pathname: "/decision-point" as any,
       params: {
         recipeId: recipe.id,
         imageUri: recipe.imageUrl || "",

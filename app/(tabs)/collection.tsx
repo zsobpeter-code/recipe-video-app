@@ -68,7 +68,7 @@ export default function CollectionScreen() {
     }
     
     router.push({
-      pathname: "/recipe-card" as any,
+      pathname: "/decision-point" as any,
       params: {
         recipeId: recipe.id,
         imageUri: recipe.imageUrl || "",

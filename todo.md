@@ -914,3 +914,62 @@ Remove old packages ($rc_monthly, $rc_annual, $rc_custom_*) and create:
 - [x] Remove pack/bundle logic
 - [x] Update Profile screen subscription display
 - [ ] Run tests and verify changes
+
+## DISHCRAFT V2 — TikTok Cooking Video Generator Pivot
+
+### PRIORITY 1: Extend RecipeCard Data Model
+- [x] Add cuisineStyle column to recipes table
+- [x] Add heroMoment column (text description of dish's "wow" moment)
+- [x] Add images JSONB column (array of image URLs — uploaded + generated)
+- [x] Add heroImage column (reference to which image is cover/hero)
+- [x] Add tikTokVideo column (URL to generated video, nullable)
+- [x] Add videoRegenUsed boolean column
+- [x] Update recipeDb.ts with new fields
+- [x] Update routers.ts with new mutation/query endpoints
+
+### PRIORITY 2: Decision Point Screen (Conversion Screen)
+- [x] Create new decision-point.tsx screen
+- [x] Recipe title + meta (cuisine, time, servings) at top
+- [x] Ingredients list (collapsed after 3-4, show "+ X more")
+- [x] Steps list (collapsed after 2-3, show "+ X more steps")
+- [x] Hero image area (tappable to change)
+- [x] PRIMARY CTA: "Generate TikTok Video" — big, orange, full-width ($6.99)
+- [x] SECONDARY CTA: "Also generate step images" — smaller, grey ($1.99)
+- [x] No back button — forward-only
+- [x] Recipe text always free and saveable
+
+### PRIORITY 3: Video Generation Pipeline
+- [x] Build Prompt Builder (recipe → Runway-optimized prompt)
+- [x] Upgrade Runway API to Gen-4.5 (gen4_turbo model)
+- [x] Change video duration to 10 seconds
+- [x] Keep 9:16 portrait aspect ratio (768:1280)
+- [x] Implement quality check (auto-regen if below threshold)
+- [x] Build FFmpeg post-processing pipeline (server-side)
+- [x] Hero bookend: [0-2s] Ken Burns zoom from hero image
+- [x] Middle: [2-10s] Runway-generated cooking montage
+- [x] End bookend: [10-12s] Hero shot + recipe title overlay
+- [x] Store final video URL in RecipeCard.tikTokVideo
+
+### PRIORITY 4: Waiting UX During Video Generation
+- [x] Animated progress (NOT percentage-based)
+- [x] Recipe steps "flash" as storyboard preview
+- [x] Checklist: Recipe understood → Building video → Final touches
+- [x] No spinner, no empty screen, no technical text
+
+### PRIORITY 5: Free Regeneration Flow
+- [x] "Not happy? Regenerate once for free" link below video
+- [x] Small link/button, NOT big button
+- [x] Only available if videoRegenUsed === false
+- [x] After use: sets videoRegenUsed = true
+- [x] Regenerate with different seed/prompt variation
+
+### PRIORITY 6: Updated Share/Export
+- [x] Text recipe — always free, shareable
+- [x] Photo RecipeCard — shareable as images/PDF
+- [x] TikTok Video — 1-tap share to TikTok, Reels, Stories
+
+### PRIORITY 7: UI Hierarchy Update
+- [x] Demote step images behind video CTA
+- [x] Video button = BIG, orange, primary
+- [x] Step images button = smaller, grey, secondary
+- [x] Update recipe-card.tsx button hierarchy

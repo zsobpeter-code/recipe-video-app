@@ -83,9 +83,9 @@ export default function RefinementScreen() {
         if (Platform.OS !== "web") {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
-        // Navigate to recipe card with NEW recipe data
+        // Navigate to decision point screen with NEW recipe data (V2)
         router.replace({
-          pathname: "/recipe-card" as any,
+          pathname: "/decision-point" as any,
           params: {
             imageUri: params.imageUri,
             dishName: data.recipe.dishName,
@@ -181,9 +181,9 @@ export default function RefinementScreen() {
   };
 
   const navigateToRecipeCardWithOriginal = (dishName: string) => {
-    // Use original recipe data with just the name updated
+    // Navigate to decision point screen (V2) with original recipe data
     router.replace({
-      pathname: "/recipe-card" as any,
+      pathname: "/decision-point" as any,
       params: {
         imageUri: params.imageUri,
         dishName,

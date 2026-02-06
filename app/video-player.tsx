@@ -32,6 +32,7 @@ import { LinearGradient } from "expo-linear-gradient";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { trpc } from "@/lib/trpc";
 import * as Sharing from "expo-sharing";
 import * as FileSystem from "expo-file-system/legacy";
 import * as MediaLibrary from "expo-media-library";
@@ -71,6 +72,8 @@ export default function VideoPlayerScreen() {
     mode?: string;
     finalVideoPath?: string; // Local path to concatenated final video
     finalVideoUrl?: string; // HTTPS URL to final video in storage
+    recipeId?: string; // Recipe ID for regeneration
+    canRegen?: string; // "true" if user can regenerate (V2 TikTok flow)
   }>();
 
   const isCookMode = params.mode === "cook";
@@ -85,6 +88,8 @@ export default function VideoPlayerScreen() {
   const [showFinalVideo, setShowFinalVideo] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const canRegen = params.canRegen === "true";
   
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stepsScrollRef = useRef<ScrollView>(null);
@@ -488,6 +493,36 @@ export default function VideoPlayerScreen() {
     }
   };
 
+  // V2: Regeneration handler
+  const handleRegenerate = async () => {
+    if (!params.recipeId || !canRegen) return;
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+    Alert.alert(
+      "Regenerate Video?",
+      "You have 1 free regeneration. This will create a new video with a different style.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Regenerate",
+          onPress: () => {
+            // Navigate back to tiktok-generation for regen
+            router.replace({
+              pathname: "/tiktok-generation" as any,
+              params: {
+                recipeId: params.recipeId,
+                heroImageUrl: params.imageUri || finalVideoSource || "",
+                dishName: params.dishName || "",
+                isRegen: "true",
+              },
+            });
+          },
+        },
+      ]
+    );
+  };
+
   const handleStepPress = (index: number) => {
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -539,6 +574,16 @@ export default function VideoPlayerScreen() {
               <IconSymbol name="square.and.arrow.up" size={20} color="#C9A962" />
             )}
           </TouchableOpacity>
+          {/* V2: Regenerate button */}
+          {canRegen && (
+            <TouchableOpacity 
+              style={styles.headerIconButton}
+              onPress={handleRegenerate}
+              activeOpacity={0.7}
+            >
+              <IconSymbol name="arrow.clockwise" size={20} color="#C9A962" />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 

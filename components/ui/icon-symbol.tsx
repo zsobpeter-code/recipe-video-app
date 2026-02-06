@@ -37,6 +37,7 @@ const MAPPING = {
   "clock.fill": "schedule",
   "person.2.fill": "people",
   "flame.fill": "local-fire-department",
+  "chart.bar.fill": "bar-chart",
   "checkmark": "check",
   "play.fill": "play-arrow",
   "pause.fill": "pause",
@@ -80,6 +81,12 @@ const MAPPING = {
   "eye": "visibility",
   "arrow.down.circle": "download",
   "photo": "photo",
+  
+  // V2 Decision Point / TikTok video
+  "sparkles": "auto-awesome",
+  "film": "movie",
+  "photo.on.rectangle": "photo-library",
+  "arrow.triangle.2.circlepath": "sync",
 } as IconMapping;
 
 /**
